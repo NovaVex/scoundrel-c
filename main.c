@@ -2,51 +2,45 @@
 #include "mainHeader.h"
 
 int main() {
+	struct gameMaster gameMaster = {0};
+	wakeGameMaster;
+    while(gameMaster.gameState >= 1){
 
-    struct _card mainDeck[44];
-    int playerChoice;
-    bool g_debugMenuEnabled = false;
-    int g_gameState = 1;
-
-    randomNumberGenerator();
-    generateDeck(mainDeck);
-
-    while(1){
-
-        switch(g_gameState) 
+        switch(gameMaster.gameState) 
         {
             case 1:
                 
-            playerChoice == drawMainMenu();
+            playerChoice = openMainMenu();
 
                 switch (playerChoice)
                 {
                     case 1:
-                    g_gameState = 2 //GameStarted
+                    gameMaster.gameState = 2; //Start Game
                     break;
 
                     case 2:
-                    g_gameState = 3 //Options
+                    gameMaster.gameState = 3; //Options
                     break;
 
-                    case 3:
-                    return 0
-
-                    case 4:
-                    return 0;
+					case 9:
+					debugMenu(&gameMaster, NULL);
+					break;
 
                     default:
                     break;
                 }
+			
+				break;
 
             case 2:
-                startGame();
+                gameLoop(&gameMaster);
                 break;
+
 	        case 3:
                 break;
                 
             case 9:
-                debugMenu();
+                debugMenu(&gameMaster);
                 continue;
         }
     }

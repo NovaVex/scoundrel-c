@@ -1,7 +1,6 @@
 #include "mainHeader.h"
 
-int drawMainMenu() {
-    int userInput;
+int drawMainMenu(){
 
 printf(
     " ================================= \n"
@@ -17,14 +16,11 @@ printf(
     "Choose an option: "
 );
 
-userInputExstraction();
-
-return userInput;
-
-}
 
 int drawDebugMenu(){
     int userInput;
+
+	clearScreen();
 
 printf(
     " ================================= \n"
@@ -33,12 +29,11 @@ printf(
     " |                               | \n"
     " ================================= \n"
     "                                   \n"
-    "        [1] Print Cards            \n"
+    "        [1] Print Game Deck        \n"
+	"        [2] Generate & Print Debug Deck \n"
     "        [2] Options                \n"
     "        [3] Quit                   \n"
     "                                   \n"
     "Choose an option: ")
-
-userInputExstraction();
 
 }
