@@ -1,11 +1,31 @@
 #include "mainHeader.h"
 
-void wakeGameMaster(struct gameMaster* startingValues){
-	
-	startingValues->debugMenuEnabled = false;
-	startingValues->debugOpen = false;
-	startingValues->gameState = 1;
-	randomNumberGenerator(startingValues);
+void gameLoop(struct gameMaster* gm){
+	struct game game = {0};
+	gameSetUp(&game);		
+		
+		
+	}
+
+void randomNumberGenerator(struct gameMaster* engine){
+
+	unsigned int startingSeed = (unsigned int)time(NULL);
+
+    srand(startingSeed);
+
+    int rngToSkip = rand() % 100;
+
+    for (int rngIncrimenter = 0; rngIncrimenter < rngToSkip; rngIncrimenter++){
+        rand();
+    }
+
+	engine->rngSeed = startingSeed;
+}
+
+bool isGameSessionActive(struct game* session){
+
+return (session != NULL);
+
 }
 
 void generateDeck(struct deck* generate){
@@ -74,63 +94,6 @@ void gameSetUp(struct game* session){
 
 }
 
-void gameLoop(struct gameMaster* gm){
-	struct game game = {0};
-	gameSetUp(&game);		
-		
-		
-	}
-	
-//Managers
-int openMainMenu(){
-		
-	clearScreen();
-	drawMainMenu();
-	userInput = processUserInput();
-	
-	return userInput
-	
-	
-}
-
-void printSessionsDeck(struct game* activeSession){
-	
-	if (isGameSessionActive(activeSession)){
-        printEntireDeck(& (activeSession->mainDeck));
-		
-	} else {
-					
-		printf("ERROR: No active game session is currently running!\n");
-					
-		}
-}
-	
-void printTestDeck(){
-	struct deck testDeck = {0};
-	generateDeck(&testDeck);
-	printEntireDeck(&testDeck);
-	pressEnterToContinue();
-	
-}
-	
-void printCurrentPlayerStats(struct game* activeSession){
-		
-	if (isGameSessionActive(activeSession)){
-		printf(
-			"Max HP: %d\nCurrent HP: %d\nWeapon Value %d\n",
-			activeSession->playerOne.MaxHP, 
-			activeSession->playerOne.hp, 
-			activeSession->playerOne.weaponValue);
-	
-	pressEnterToContinue();
-		
-	} else {
-					
-		printf("ERROR: No active game session is currently running!\n");
-					
-		}
-}
-
 void printDungeonRoom(struct game* activeSession){
 		
 	if (isGameSessionActive(activeSession)){
@@ -155,32 +118,40 @@ void printDungeonRoom(struct game* activeSession){
 //debug tools
 
 void openDebugMenu(struct gameMaster* engine, struct game* activeSession){
-    if (not debugMenuEnabled) {
+    if (not engine->debugMenuEnabled) {
         return; 
     }
 	engine->debugOpen = true;
 	
     int playerChoice;
 	
-    while(engine->debugOpen = true) {
+    while(engine->debugOpen == true) {
         drawDebugMenu(); 
         
-        playerChoice = processUserInput;
+        playerChoice = processUserInput();
 
         switch (playerChoice) {
 
             case 1://Print currently Active deck
-				printSessionsDeck(activeSession);
+				printSessionsDeck(& (activeSession->maindeck));
                 continue;
-
-            case 2: //Print a generated Test Deck
+				
+			case 2:
+				printSessionDeck(& (activeSession->discardPile));
+				continue;
+				
+            case 3: //Print a generated Test Deck
 				printTestDeck();
                 continue;
 				
-			case 3:
-				printCurrentPlayerStats;
+			case 4:
+				printCurrentPlayerStats(& (activeSession->playerOne));
 				continue;
-			
+				
+			case 5:
+				printDungeonRoom(& (activeSession->dungeonRoom));
+				continue;
+				
             case 9://Close Menu
 				engine->debugOpen = false;
                 return; 
@@ -189,32 +160,68 @@ void openDebugMenu(struct gameMaster* engine, struct game* activeSession){
                 break;
         }
 		
-    }
+};
 
+void debugGenerateTempTestDeck(){
+	struct deck testDeck = {0};
+	generateDeck(&testDeck);
+	printEntireDeck(&testDeck);
+	pressEnterToContinue();
+	
 }
-
-
 
 
 // Print each piece of data from the current card.
+void printSessionsDeck(struct game* activeSession){
+	
+	if (isGameSessionActive(activeSession)){
+        printEntireDeck(& (activeSession->mainDeck));
+		
+	} else {
+					
+		printf("ERROR: No active game session is currently running!\n");
+					
+	}
+};
 
 
-void printEntireDeck(struct card deck[], int deckSize) {
 
-    for(int incrementer = 0; i < deckSize; incrementer++) {
+
+
+
+void printEntireDeckLoop(struct deck* deck ) {
+
+	int deckSize = deck->deckSize;
+    for(int incrementer = 0; incrementer < deckSize; incrementer++) {
 		printf("Card ID: %d | Type: %c | Value: %d\n", 
-            deck[incrementer].id, 
-            deck[incrementer].type, 
-            deck[incrementer].cardValue);
+            deck->cards[incrementer].id, 
+            deck->cards[incrementer].type, 
+            deck->cards[incrementer].cardValue);
 
+}
+	
+	
+	printf("--- END OF ARRAY ---\n");
+};
+
+void printCurrentPlayerStats(struct game* activeSession){
+		
+		printf(
+			"Max HP: %d\nCurrent HP: %d\nWeapon Value %d\n",
+			activeSession->playerOne.MaxHP, 
+			activeSession->playerOne.hp, 
+			activeSession->playerOne.weaponValue);
+}
+
+void printEntireDungeonRoomLoop(struct dungeon* dungeon) {
+	
+	int encounterSlots = dungeon->encounterCounter;
+    for(int incrementer = 0; incrementer < encounterSlots; incrementer++) {
+		printf("Dungeon Slot %d | Card ID: %d | Type: %c | Value: %d\n",
+		incrementer,
+		dungeon->card[incrementer].id,
+		dungeon->card[incrementer].type,
+		dungeon->card[incrementer].cardValue);
 	}
 	printf("--- END OF ARRAY ---\n");
 }
-
-void printEntireDungeonRoom(struct dungeon, int encounterSlots) {
-
-    for(int incrementer = 0; i < encounterSlots; incrementer++) {
-
-
-	}
-	printf("--- END OF ARRAY ---\n");

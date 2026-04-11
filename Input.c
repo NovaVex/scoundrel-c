@@ -1,4 +1,5 @@
-#include "mainHeader.h"
+#pragma once
+#include "game_types.h"
 
 
 int processUserInput(){// possibly need to redo. Doing too many things at once.
@@ -42,26 +43,6 @@ int processUserInput(){// possibly need to redo. Doing too many things at once.
 
 }
 
-void randomNumberGenerator(struct gameMaster* engine){
-
-	unsigned int startingSeed = (unsigned int)time(NULL);
-
-    srand(startingSeed);
-
-    int rngToSkip = rand() % 100;
-
-    for (int rngIncrimenter = 0; rngIncrimenter < rngToSkip; rngIncrimenter++){
-        rand();
-    }
-
-	engine->rngSeed = startingSeed;
-}
-
-void clearScreen(){
-
-    printf("\033[H\033[J"); 
-}
-
 void pressEnterToContinue(){
     int c;
     
@@ -70,10 +51,4 @@ void pressEnterToContinue(){
     printf("\nPress [Enter] to continue...");
     
     getchar(); 
-}
-
-bool isGameSessionActive(struct activeGameSession* session){
-
-return (session != NULL);
-
 }

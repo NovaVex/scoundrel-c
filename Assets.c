@@ -1,4 +1,4 @@
-#include "mainHeader.h"
+#include "game_types.h"
 
 int drawMainMenu(){
 
@@ -17,10 +17,7 @@ printf(
 );
 
 
-int drawDebugMenu(){
-    int userInput;
-
-	clearScreen();
+void drawDebugMenu(){
 
 printf(
     " ================================= \n"
@@ -36,4 +33,4 @@ printf(
     "                                   \n"
     "Choose an option: ")
 
-}
+};
