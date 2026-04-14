@@ -1,6 +1,10 @@
+#include "Game_master.h"
+
+#include <stdlib.h>
+#include <time.h>
 #include "Data_Structure.h"
-#include "scene_manager.h"
-#include "Game_Loop.c"
+#include "Scene_manager.h"
+
 
 
 void gameMaster(){
@@ -48,7 +52,7 @@ while(gameMaster.gameState >= 1){
         }
     }
 	return 0;
-};
+}
 
 void wakeGameMaster(struct gameMaster* startingValues){
 	
@@ -56,4 +60,47 @@ void wakeGameMaster(struct gameMaster* startingValues){
 	startingValues->debugOpen = false;
 	startingValues->gameState = 1;
 	randomNumberGenerator(startingValues);
-};
+}
+
+void gameLoop(struct gameMaster* gm){
+	struct game game = {0};
+	gameSetUp(&game);		
+		
+		
+	}
+
+void gameSetUp(struct game* session){
+	setPlayerDefault(& (session->playerOne));	
+	generateDeck(& (session->mainDeck));
+	shuffleDeck(& (session->mainDeck));
+
+}
+
+void setPlayerDefault(struct player* defaultValues){
+	
+	defaultValues->maxHP = 20;
+	defaultValues->hp = 20;
+	defaultValues-> weaponValue = 0;
+}
+
+	
+bool isGameSessionActive(struct game* session){
+
+return (session != NULL);
+
+}
+
+void randomNumberGenerator(struct gameMaster* engine){
+
+	unsigned int startingSeed = (unsigned int)time(NULL);
+
+    srand(startingSeed);
+
+    int rngToSkip = rand() % 100;
+
+    for (int rngIncrimenter = 0; rngIncrimenter < rngToSkip; rngIncrimenter++){
+        rand();
+    }
+
+	engine->rngSeed = startingSeed;
+}

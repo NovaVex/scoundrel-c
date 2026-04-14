@@ -1,16 +1,10 @@
 #pragma once
 
-void pressEnterToContinue(){
-    int c;
-    
-    while ((c = getchar()) != '\n' && c != EOF) { } 
-    
-    printf("\nPress [Enter] to continue...");
-    
-    getchar(); 
-}
+void clearScreen();
 
-void clearScreen(){
-
-    printf("\033[H\033[J"); 
-}
+//Debug Functions
+void printDungeonRoom(struct game* activeSession);
+void printSessionDeck(struct game* activeSession);
+void printEntireDeckLoop(struct deck* deck );
+void printCurrentPlayerStats(struct game* activeSession);
+void printEntireDungeonRoom(struct dungeon* dungeon);

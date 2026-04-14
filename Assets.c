@@ -1,6 +1,6 @@
 #include "game_types.h"
 
-int drawMainMenu(){
+void drawMainMenu(){
 
 printf(
     " ================================= \n"
@@ -14,8 +14,8 @@ printf(
     "        [3] Quit                   \n"
     "                                   \n"
     "Choose an option: "
-);
-
+	);
+}
 
 void drawDebugMenu(){
 
@@ -31,6 +31,6 @@ printf(
     "        [2] Options                \n"
     "        [3] Quit                   \n"
     "                                   \n"
-    "Choose an option: ")
+    "Choose an option: ");
 
-};
+}

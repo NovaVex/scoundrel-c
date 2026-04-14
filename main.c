@@ -1,5 +1,4 @@
-#include <stdio.h>
-#include "mainHeader.h"
+#include "Game_master.h"
 
 int main() {
 		gameMaster();

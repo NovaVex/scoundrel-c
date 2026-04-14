@@ -1,8 +1,11 @@
-#pragma once
-#include "game_types.h"
+#include "Input.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <iso646.h>
 
-
-int processUserInput(){// possibly need to redo. Doing too many things at once.
+int processUserInput(){// possibly need to redo. Doing too many things at once. Update to pass struct
 
     char rawUserInput[21];
     int playerChoice = -1;
@@ -13,14 +16,14 @@ int processUserInput(){// possibly need to redo. Doing too many things at once.
     {
         if (strcmp(rawUserInput, "debug") == 0)
         {
-            g_debugMenuEnabled = not g_debugMenuEnabled;
+            g_debugMenuEnabled = not g_debugMenuEnabled; //this is no longer a thing.
             printf("Debug menu enabled.\n");
             return 0;
         }
         
         else
         {
-            printf("Unknown command. Please use 1-9 to make a selection.\n")
+            printf("Unknown command. Please use 1-9 to make a selection.\n");
             return 0;
         }
         
