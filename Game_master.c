@@ -4,6 +4,7 @@
 #include <time.h>
 #include "Data_Structure.h"
 #include "Scene_manager.h"
+#include "Game_mechanics.c"
 
 
 
@@ -63,11 +64,55 @@ void wakeGameMaster(struct gameMaster* startingValues){
 }
 
 void gameLoop(struct gameMaster* gm){
-	struct game game = {0};
-	gameSetUp(&game);		
+	struct game session = {0};
+	gameSetUp(&session);		
+	InGameState currentGameState = PLAYING_ACTIVE;
+	
+	while(currentGameState != PLAYING_EXIT);{
 		
+		switch(currentGameState){
+			
+			case PLAYING_ACTIVE:
+				currentGameState = activeGameManger(&session, gm);
+				break;
+				
+			case PLAYING_PAUSED:
+				currentGameState = activeGamePauseManger(&session, gm);
+				break;
+				
+			case PLAYING_OPTIONS:
+				currentGameState = activeGameOptionsManger(&session, gm);
+				break;
+				
+			case PLAYING_GAMEOVER:
+				currentGameState = activeGameOverManger(&session, gm);
+				break;
+				
+			case PLAYING_EXIT:
+			default
+			//to do error handling
+			currentGameState = PLAYING_EXIT;
+			break;
+		}
 		
 	}
+}
+
+InGameState activeGameManger(struct game*, struct gameMaster*){
+	
+}
+
+InGameState activeGamePauseManger(struct game*, struct gameMaster*){
+	
+}
+
+InGameState activeGameOptionsManger(struct game*, struct gameMaster*){
+	
+}
+
+InGameState activeGameOverManger(struct game*, struct gameMaster*){
+	
+}
 
 void gameSetUp(struct game* session){
 	setPlayerDefault(& (session->playerOne));	
@@ -77,13 +122,12 @@ void gameSetUp(struct game* session){
 }
 
 void setPlayerDefault(struct player* defaultValues){
-	
+	defaultValues->minHp = 0;
 	defaultValues->maxHP = 20;
 	defaultValues->hp = 20;
-	defaultValues-> weaponValue = 0;
+	defaultValues-> weapon.equipped = 0;
 }
 
-	
 bool isGameSessionActive(struct game* session){
 
 return (session != NULL);
