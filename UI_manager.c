@@ -5,12 +5,10 @@
 #include <iso646.h>
 #include <stdio.h>
 
-
 void clearScreen(){
 
     printf("\033[H\033[J"); 
 }
-
 
 //debug tools
 
@@ -54,8 +52,7 @@ void printEntireDeckLoop(struct deck* deck ) {
             deck->cards[incrementer].cardValue);
 
 }
-	
-	
+
 	printf("--- END OF ARRAY ---\n");
 }
 
@@ -79,4 +76,31 @@ void printEntireDungeonRoom(struct dungeon* dungeon) {
 		dungeon->card[incrementer].cardValue);
 	}
 	printf("--- END OF ARRAY ---\n");
+}
+
+void debugRender(struct game* game) {
+    printf("\n=== SCOUNDREL DEBUG VIEW ===\n");
+
+    printf("HP: %d/20\n", game->player.hp);
+    
+    if (game->player.weaponValue > 0) {
+        printf("Weapon Value: %d | Last Kill: %d\n", 
+                game->player.weaponValue, game->player.lastKillValue);
+    } else {
+        printf("Weapon: [UNARMED]\n");
+    }
+
+    printf("Cards in Deck: %d\n", game->deck.remainingCards);
+    printf("Can Flee Room? %s\n", game->state.canFlee ? "YES" : "NO");
+    printf("----------------------------\n");
+    
+    for (int i = 0; i < 4; i++) {
+        if (game->room[i].isActive) {
+
+            printf("Slot %d: [%d of %c]\n", i + 1, game->room[i].value, game->room[i].suit);
+        } else {
+            printf("Slot %d: [EMPTY]\n", i + 1);
+        }
+    }
+    printf("============================\n");
 }

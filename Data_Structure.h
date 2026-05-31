@@ -1,79 +1,82 @@
 #pragma once
 #include <stdbool.h>
 
-#define MAX_DECK_SIZE 50
+#define DECK_SIZE 52
 #define MAX_ROOM_SIZE 4
-struct gameMaster{
+#define MAX_MONSTER_WEAPON_STACK 13
 
-	bool debugMenuEnabled;
-	bool debugOpen;
-    int gameState;
-	int rngSeed;
-	//int screenWidth
-	//int screenHeight
-	
-};
-
-struct card{
-
-    int id;
-    char type;
-    int value;
-};
-
-struct deck{
-	
-	int currentDeckSlot;
-	int deckSize;
-	struct card cards[MAX_DECK_SIZE];
-};
-
-struct weapon{
-	
-	struct card 	equipped;
-	struct card 	monsterStack[13];
-	int killCount;
-};
-
-struct player{
-	int minHP;
-	int maxHP;
-    int hp;
-    struct weapon	weapon;
-};
-
-struct dungeon{
-
-	int encounterCounter;
-	struct card 	encounterSlots[4];
-};
-
-struct game{
-
-	struct player 		playerOne;
-	struct deck			mainDeck;
-	struct dungeon 		dungeonRoom;
-	struct deck 		discardPile;
-};
-//Remember to move these to where they actually belong
-typedef enum{
+typedef enum {
     WEAPON_NONE,           
     WEAPON_FRESH,          
     WEAPON_VALID_COMBO,    
     WEAPON_INVALID_COMBO   
 } WeaponState;
 
-typedef enum{
-	EMPTY = 'E',
-	MONSTER = 'M',
-	POTION = 'P',
-	WEAPON = 'W'
-} CardType;
+typedef enum {
+    EMPTY = 'E',
+    MONSTER = 'M',
+    POTION = 'P',
+    WEAPON = 'W',
+    FLEE = 'F'
+} EncounterType;
 
 typedef enum {
-	PLAYING_ACTIVE,
+    PLAYING_ACTIVE,
     PLAYING_PAUSED,
     PLAYING_OPTIONS,
     PLAYING_GAMEOVER,
     PLAYING_EXIT
 } InGameState;
+
+struct gameMaster {
+    bool debugMenuEnabled;
+    bool debugOpen;
+    int gameState; 
+    int rngSeed;
+    //int screenWidth;
+    //int screenHeight;
+};
+
+struct card {
+    int id;
+    char type; 
+    int value;
+};
+
+typedef struct CardLink {
+    struct card* data;
+    struct CardLink* nextCard; 
+} CardLink;
+
+typedef struct {
+    CardLink* topCard;
+    CardLink* bottomCard;
+    int count;
+} Zone;
+
+struct weapon {
+    struct card* equipped;
+    struct card* monsterStack[MAX_MONSTER_WEAPON_STACK];
+    int killCount;
+};
+
+struct player {
+    int minHP;
+    int maxHP;
+    int hp;
+    struct weapon weapon;
+    bool canFlee;
+};
+
+struct game {
+    struct gameMaster gm;
+
+    struct card globalCardPool[DECK_SIZE];
+    CardNode linkPool[DECK_SIZE];
+
+    Zone mainDeck;
+    Zone discardPile;
+    CardLink* roomSlots[MAX_ROOM_SIZE];
+
+    struct player playerOne;
+};

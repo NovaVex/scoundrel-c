@@ -9,7 +9,6 @@
 #include <stdbool.h>
 #include <iso646.h>
 
-
 int openMainMenu(){
 
 	clearScreen();

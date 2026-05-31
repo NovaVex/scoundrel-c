@@ -2,7 +2,6 @@
 
 #include "Data_Structure.h"
 
-
 int openMainMenu();
 
 void openDebugMenu(struct gameMaster* engine, struct game* activeSession);

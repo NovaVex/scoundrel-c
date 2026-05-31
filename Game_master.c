@@ -6,8 +6,6 @@
 #include "Scene_manager.h"
 #include "Game_mechanics.c"
 
-
-
 void gameMaster(){
 	struct gameMaster gameMaster = {0};
 	wakeGameMaster(&gameMaster);
@@ -125,7 +123,8 @@ void setPlayerDefault(struct player* defaultValues){
 	defaultValues->minHp = 0;
 	defaultValues->maxHP = 20;
 	defaultValues->hp = 20;
-	defaultValues-> weapon.equipped = 0;
+	defaultValues->weapon.equipped = 0;
+	defaultValues->canFlee = true;
 }
 
 bool isGameSessionActive(struct game* session){
