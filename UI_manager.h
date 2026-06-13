@@ -1,10 +1,24 @@
 #pragma once
+#include "Data_Structure.h"
 
+// ========================================================
+// Basic utilities
+// ========================================================
 void clearScreen();
 
-//Debug Functions
-void printDungeonRoom(struct game* activeSession);
-void printSessionDeck(struct game* activeSession);
-void printEntireDeckLoop(struct deck* deck );
+// ========================================================
+// Debug printing (targeted)
+// ========================================================
 void printCurrentPlayerStats(struct game* activeSession);
-void printEntireDungeonRoom(struct dungeon* dungeon);
+void printEntireDeckLoop(Zone* pile);
+
+// ========================================================
+// Debug tools (session level)
+// ========================================================
+void printSessionDeck(struct game* activeSession);
+void printDungeonRoom(struct game* activeSession);
+
+// ========================================================
+// Master debug renderer
+// ========================================================
+void debugRender(struct game* game);

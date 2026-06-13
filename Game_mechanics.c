@@ -3,15 +3,17 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+// ========================================================
+// Card Manipulation 
+// ========================================================
 CardLink* drawTopCard(Zone* pile) {
-
     if (pile->count == 0) return NULL;
 
     CardLink* drawnCard = pile->topCard;
     
     pile->topCard = drawnCard->next;
     pile->count--;
-    drawnCard->nextCard = NULL; 
+    drawnCard->next = NULL; 
     
     if (pile->count == 0) pile->bottomCard = NULL;
     
@@ -23,24 +25,26 @@ void placeAtBottom(Zone* pile, CardLink* card) {
 
     if (pile->count == 0) {
         pile->topCard = card;
-        pile->bottomCard = card;
+        pile->bottomCard = (void*)card;
         pile->count++;
         return;
     }
 
     CardLink* currentBottom = (CardLink*)pile->bottomCard;
-	
-    currentBottom->nextCard = card;
-    pile->bottomCard = card;
+    
+    currentBottom->next = card;
+    pile->bottomCard = (void*)card;
     
     pile->count++;
 }
 
+// ========================================================
+// Builders
+// ========================================================
 void generateCardPool(struct game* game, int* outTotalCards) {
     int cardValueGenerator = 2;
     int deckIncrementer; 
 
-    // Chunk 1: Monsters
     for (deckIncrementer = 0; deckIncrementer < 26; deckIncrementer++) {
         if (cardValueGenerator == 15) cardValueGenerator = 2; 
         
@@ -51,7 +55,6 @@ void generateCardPool(struct game* game, int* outTotalCards) {
 
     cardValueGenerator = 2;
 
-    // Chunk 2: Potions
     for (deckIncrementer = 26; deckIncrementer < 35; deckIncrementer++) {
         game->globalCardPool[deckIncrementer].id = deckIncrementer + 1;
         game->globalCardPool[deckIncrementer].type = POTION;
@@ -60,7 +63,6 @@ void generateCardPool(struct game* game, int* outTotalCards) {
 
     cardValueGenerator = 2;
 
-    // Chunk 3: Weapons
     for (deckIncrementer = 35; deckIncrementer < 44; deckIncrementer++) {
         game->globalCardPool[deckIncrementer].id = deckIncrementer + 1;
         game->globalCardPool[deckIncrementer].type = WEAPON;
@@ -71,9 +73,7 @@ void generateCardPool(struct game* game, int* outTotalCards) {
 }
 
 void cardShuffle(CardLink** cardArray, int totalCards) {
-
     for (int currentSlot = totalCards - 1; currentSlot > 0; currentSlot--) {
-        
         int randomSlot = rand() % (currentSlot + 1);
 
         CardLink* cardInHand = cardArray[currentSlot];
@@ -83,91 +83,113 @@ void cardShuffle(CardLink** cardArray, int totalCards) {
 }
 
 void buildDeck(struct game* game, int totalCards) {
-    CardNode* shuffleArray[DECK_SIZE];
+    CardLink* shuffleArray[DECK_SIZE];
     
-    for (int i = 0; i < totalCards; i++) {
-        game->nodePool[i].cardRef = &game->globalCardPool[i];
-        game->nodePool[i].next = NULL;
-        shuffleArray[i] = &game->nodePool[i];
+    for (int currentSlot = 0; currentSlot < totalCards; currentSlot++) {
+        CardLink* currentLink = (CardLink*)&game->nodePool[currentSlot];
+        
+        currentLink->data = &game->globalCardPool[currentSlot];
+        currentLink->next = NULL;
+        
+        shuffleArray[currentSlot] = currentLink;
     }
 
     cardShuffle(shuffleArray, totalCards);
 
-    game->mainDeck.head = shuffleArray[0];
-    for (int i = 0; i < totalCards - 1; i++) {
-        shuffleArray[i]->next = shuffleArray[i + 1];
+    game->mainDeck.topCard = shuffleArray[0];
+    
+    for (int currentSlot = 0; currentSlot < totalCards - 1; currentSlot++) {
+        CardLink* currentCard = shuffleArray[currentSlot];
+        CardLink* cardDirectlyBeneath = shuffleArray[currentSlot + 1];
+        
+        currentCard->next = cardDirectlyBeneath;
     }
-    shuffleArray[totalCards - 1]->next = NULL;
+    
+    int lastCardIndex = totalCards - 1;
+    shuffleArray[lastCardIndex]->next = NULL;
 
-    game->mainDeck.tail = shuffleArray[totalCards - 1];
+    game->mainDeck.bottomCard = (void*)shuffleArray[lastCardIndex];
     game->mainDeck.count = totalCards;
 }
 
+// ========================================================
+// Managers
+// ========================================================
 void dealRoomCards(struct game* game) {
-    for (int i = 0; i < MAX_ROOM_SIZE; i++) {
+    Zone* deck = &game->mainDeck;
+    
+    for (int roomSlot = 0; roomSlot < MAX_ROOM_SIZE; roomSlot++) {
+        if (deck->count == 0) return;
 
-        if (game->roomSlots[i] == NULL && game->mainDeck.count > 0) {
-            game->roomSlots[i] = popTop(&game->mainDeck);
+        if (isRoomSlotEmpty(game, roomSlot)) {
+            CardLink* drawnCard = drawTopCard(deck);
+            game->roomSlots[roomSlot] = (void*)drawnCard;
         }
     }
 }
 
 void fleeManager(struct game* game) {
     if (game->playerOne.canFlee == false) {
-        printf("You can not flee\n");
         return; 
     }
     
-    // Need
     for (int i = 0; i < MAX_ROOM_SIZE; i++) {
-        if (game->roomSlots[i] != NULL) {
-            pushBottom(&game->mainDeck, game->roomSlots[i]);
+        if (!isRoomSlotEmpty(game, i)) {
+            placeAtBottom(&game->mainDeck, (CardLink*)game->roomSlots[i]);
             game->roomSlots[i] = NULL;
         }
     }
     
     setCanFleeFalse(&(game->playerOne));
+    
+    dealRoomCards(game);
 }
 
-void encounterManager(struct game* game, int encounterSlot) {
-    if (game->roomSlots[encounterSlot] == NULL) {
-        return;
-    }
+void encounterManager(struct game* game, int chosenSlot) {
+    if (isRoomSlotEmpty(game, chosenSlot)) return;
 
-    CardNode* activeNode = game->roomSlots[encounterSlot];
-    struct card* encounter = activeNode->cardRef;
+    CardLink* cardLinkOnTable = (CardLink*)game->roomSlots[chosenSlot];
+    struct card* actualCard = cardLinkOnTable->data;
     
-    setCanFleeFalse(&(game->playerOne));
+    struct player* player = &game->playerOne;
+    Zone* discardPile = &game->discardPile;
     
-    switch(encounter->type) {
+    setCanFleeFalse(player);
+    
+    switch (actualCard->type) {
         case MONSTER:
-            combatManager(&(game->playerOne), encounter);
+            combatManager(player, actualCard);
             break;
             
         case POTION:
-            healManager(&(game->playerOne), encounter);
+            healManager(player, actualCard);
             break;
             
         case WEAPON:
-            equipWeapon(&(game->playerOne), encounter);
+            equipWeapon(player, actualCard);
             break;
     }
     
-    pushBottom(&game->discardPile, activeNode);
-    game->roomSlots[encounterSlot] = NULL;
+    placeAtBottom(discardPile, cardLinkOnTable);
+    game->roomSlots[chosenSlot] = NULL; 
 }
 
-//still unsure how I want to do player death.
-
 void combatManager(struct player* player, struct card* monster) {
-    int damageDealt = 0;
-    int playerHp = 0;
+	
+    WeaponState currentState = checkWeaponState(player, monster);
     
-    damageDealt = decideDamageValue(player, monster);
-    playerHp = clampedDamageToPlayer(player->hp, player->minHP, player->maxHP, damageDealt);
-    setPlayerHealth(player, playerHp);
+    int damageTaken = decideDamageValue(player, monster);
+    int newHp = clampedDamageToPlayer(player->hp, player->minHP, player->maxHP, damageTaken);
+    setPlayerHealth(player, newHp);
     
-    bool playerDead = isPlayerDead(player);
+    if (currentState == WEAPON_FRESH || currentState == WEAPON_VALID_COMBO) {
+        int killIndex = player->weapon.killCount;
+        
+        if (killIndex < MAX_MONSTER_WEAPON_STACK) {
+            player->weapon.monsterStack[killIndex] = monster;
+            player->weapon.killCount++;
+        }
+    }
 }
 
 void healManager(struct player* player, struct card* potion) {
@@ -183,7 +205,15 @@ void equipWeapon(struct player* player, struct card* encounterWeapon) {
     player->weapon.equipped = encounterWeapon; 
 }
 
-//Helpers 
+// ========================================================
+// Helpers
+// ========================================================
+bool isRoomSlotEmpty(struct game* game, int slotIndex) {
+    if (game->roomSlots[slotIndex] == NULL) {
+        return true;
+    }
+    return false;
+}
 
 bool isPlayerDead(struct player* player) {
     int playerHp = player->hp;
@@ -198,7 +228,8 @@ int decideDamageValue(struct player* player, struct card* monster) {
     switch(currentState) {
         case WEAPON_FRESH:
         case WEAPON_VALID_COMBO:
-            damageDealt = player->weapon.equipped->value - monster->value;
+
+            damageDealt = monster->value - player->weapon.equipped->value;
             break;
             
         case WEAPON_NONE:
@@ -207,7 +238,7 @@ int decideDamageValue(struct player* player, struct card* monster) {
             break;
     }
     return damageDealt;
-} 
+}
 
 WeaponState checkWeaponState(struct player* player, struct card* monster) {
     if (player->weapon.equipped == NULL || player->weapon.equipped->value == 0) {
@@ -220,7 +251,7 @@ WeaponState checkWeaponState(struct player* player, struct card* monster) {
     
     int lastKillIndex = player->weapon.killCount - 1;
     lastKillIndex = preventNegative(lastKillIndex);
-
+    
     if (monster->value < player->weapon.monsterStack[lastKillIndex]->value) {
         return WEAPON_VALID_COMBO;
     }
@@ -269,4 +300,14 @@ void setCanFleeFalse(struct player* player) {
 
 void setCanFleeTrue(struct player* player) {
     player->canFlee = true;
+}
+
+int countCardsInRoom(struct game* game) {
+    int count = 0;
+    for (int i = 0; i < MAX_ROOM_SIZE; i++) {
+        if (!isRoomSlotEmpty(game, i)) {
+            count++;
+        }
+    }
+    return count;
 }

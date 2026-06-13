@@ -1,9 +1,14 @@
 #pragma once
-
 #include "Data_Structure.h"
 
+// ========================================================
+// CORE SCENES
+// ========================================================
 int openMainMenu();
+int runActiveGameScene(struct game* session);
 
-void openDebugMenu(struct gameMaster* engine, struct game* activeSession);
-
+// ========================================================
+// DEBUG SCENES
+// ========================================================
 void debugGenerateTempTestDeck();
+void openDebugMenu(struct gameMaster* engine, struct game* activeSession);

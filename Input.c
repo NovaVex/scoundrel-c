@@ -3,55 +3,43 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <iso646.h>
 
-int processUserInput(){// possibly need to redo. Doing too many things at once. Update to pass struct
-
+// ========================================================
+// Input processing
+// ========================================================
+int processUserInput() {
     char rawUserInput[21];
-    int playerChoice = -1;
 
-    scanf("%20s", rawUserInput);
-
-    if (isalpha(rawUserInput[0]))
-    {
-        if (strcmp(rawUserInput, "debug") == 0)
-        {
-            g_debugMenuEnabled = not g_debugMenuEnabled; //this is no longer a thing.
-            printf("Debug menu enabled.\n");
-            return 0;
-        }
-        
-        else
-        {
-            printf("Unknown command. Please use 1-9 to make a selection.\n");
-            return 0;
-        }
-        
+    if (scanf("%20s", rawUserInput) != 1) {
+        return -1;
     }
-    else
-    {
-        if (isdigit(rawUserInput[0]))
-        {
-        playerChoice = atoi(rawUserInput);
+
+    if (isalpha(rawUserInput[0])) {
+        if (strcmp(rawUserInput, "debug") == 0) {
+            printf("Debug command recognized.\n");
+            return 99;
         }
+        printf("Unknown command. Please use 0-9 to make a selection.\n");
+        return -1;
+    }
     
-        else
-        {
-            printf("Unknown command, please use 1-9 to make a selection.");
-            return 0;
-        }
+    if (isdigit(rawUserInput[0])) {
+        int playerChoice = atoi(rawUserInput);
+        return playerChoice;
     }
 
-    return playerChoice;
-
+    printf("Unknown command. Please use 0-9 to make a selection.\n");
+    return -1;
 }
 
-void pressEnterToContinue(){
+// ========================================================
+// Utilities
+// ========================================================
+void pressEnterToContinue() {
     int c;
     
     while ((c = getchar()) != '\n' && c != EOF) { } 
     
     printf("\nPress [Enter] to continue...");
-    
     getchar(); 
 }

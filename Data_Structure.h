@@ -21,6 +21,16 @@ typedef enum {
 } EncounterType;
 
 typedef enum {
+    INPUT_SLOT_0 = 1,
+    INPUT_SLOT_1 = 2,
+    INPUT_SLOT_2 = 3,
+    INPUT_SLOT_3 = 4,
+    INPUT_FLEE = 5,
+    INPUT_NEXT_ROOM = 8,
+    INPUT_PAUSE = 9
+} PlayerInput;
+
+typedef enum {
     PLAYING_ACTIVE,
     PLAYING_PAUSED,
     PLAYING_OPTIONS,
@@ -33,8 +43,6 @@ struct gameMaster {
     bool debugOpen;
     int gameState; 
     int rngSeed;
-    //int screenWidth;
-    //int screenHeight;
 };
 
 struct card {
@@ -45,7 +53,7 @@ struct card {
 
 typedef struct CardLink {
     struct card* data;
-    struct CardLink* nextCard; 
+    struct CardLink* next; 
 } CardLink;
 
 typedef struct {
@@ -70,13 +78,10 @@ struct player {
 
 struct game {
     struct gameMaster gm;
-
     struct card globalCardPool[DECK_SIZE];
-    CardNode linkPool[DECK_SIZE];
-
+    CardLink nodePool[DECK_SIZE];
     Zone mainDeck;
     Zone discardPile;
     CardLink* roomSlots[MAX_ROOM_SIZE];
-
     struct player playerOne;
 };

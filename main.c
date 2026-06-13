@@ -1,6 +1,8 @@
 #include "Game_master.h"
 
 int main() {
-		gameMaster();
-return 0;
+    
+    gameMaster();
+    
+    return 0;
 }
