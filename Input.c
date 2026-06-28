@@ -11,6 +11,8 @@ int processUserInput() {
     char rawUserInput[21];
 
     if (scanf("%20s", rawUserInput) != 1) {
+        
+        if (feof(stdin)) exit(0);
         return -1;
     }
 
@@ -22,7 +24,7 @@ int processUserInput() {
         printf("Unknown command. Please use 0-9 to make a selection.\n");
         return -1;
     }
-    
+
     if (isdigit(rawUserInput[0])) {
         int playerChoice = atoi(rawUserInput);
         return playerChoice;
@@ -36,10 +38,10 @@ int processUserInput() {
 // Utilities
 // ========================================================
 void pressEnterToContinue() {
-    int c;
-    
-    while ((c = getchar()) != '\n' && c != EOF) { } 
-    
+    int leftoverCharacter;
+
+    while ((leftoverCharacter = getchar()) != '\n' && leftoverCharacter != EOF) { }
+
     printf("\nPress [Enter] to continue...");
-    getchar(); 
+    getchar();
 }
