@@ -181,7 +181,6 @@ void combatManager(struct player* activePlayer, struct card* monsterCard, bool f
 }
 
 EncounterResult healManager(struct player* activePlayer, struct card* potionCard) {
-    
     if (activePlayer->potionUsedThisRoom) return ENCOUNTER_POTION_FIZZLED;
 
     int healedHealth = clampedPlayerHeal(

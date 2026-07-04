@@ -11,7 +11,6 @@ int processUserInput() {
     char rawUserInput[21];
 
     if (scanf("%20s", rawUserInput) != 1) {
-        
         if (feof(stdin)) exit(0);
         return -1;
     }

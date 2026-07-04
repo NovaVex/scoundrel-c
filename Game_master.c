@@ -17,26 +17,33 @@ int gameMaster() {
 
     while (engine.gameState >= 1) {
         switch (engine.gameState) {
-            case 1: {
+            
+            case 1: { // Main Menu
                 int playerChoice = openMainMenu();
-
-                if (playerChoice == 1) engine.gameState = 2;
-                if (playerChoice == 2) engine.gameState = 3;
-                if (playerChoice == 9) openDebugMenu(&engine, NULL);
-                if (playerChoice == 99) engine.debugMenuEnabled = !engine.debugMenuEnabled;
-                if (playerChoice == 0) engine.gameState = 0;
+                
+                switch (playerChoice) {
+                    case 1:  engine.gameState = 2; break;
+                    case 2:  engine.gameState = 3; break;
+                    case 9:  openDebugMenu(&engine, NULL); break;
+                    case 99: engine.debugMenuEnabled = !engine.debugMenuEnabled; break;
+                    case 0:  engine.gameState = 0; break;
+                    default: break; // Ignore invalid inputs
+                }
                 break;
             }
 
-            case 2:
+            case 2: // Active Game
                 gameLoop(&engine);
                 break;
 
-            case 3: {
+            case 3: { // Options Menu
                 int playerChoice = runOptionsScene(engine.debugMenuEnabled);
-
-                if (playerChoice == 1) engine.debugMenuEnabled = !engine.debugMenuEnabled;
-                if (playerChoice == 9) engine.gameState = 1;
+                
+                switch (playerChoice) {
+                    case 1:  engine.debugMenuEnabled = !engine.debugMenuEnabled; break;
+                    case 9:  engine.gameState = 1; break;
+                    default: break; 
+                }
                 break;
             }
 
@@ -146,11 +153,16 @@ InGameState activeGameManager(struct game* session, struct gameMaster* engine) {
 InGameState activeGamePauseManager() {
     int playerChoice = runPauseScene();
 
-    if (playerChoice == 1) return PLAYING_ACTIVE;
-    if (playerChoice == 2) return PLAYING_OPTIONS;
-    if (playerChoice == 9) return PLAYING_EXIT;
-
-    return PLAYING_PAUSED;
+    switch (playerChoice) {
+        case 1:
+            return PLAYING_ACTIVE;
+        case 2:
+            return PLAYING_OPTIONS;
+        case 9:
+            return PLAYING_EXIT;
+        default:
+            return PLAYING_PAUSED;
+    }
 }
 
 InGameState activeGameOptionsManager(struct gameMaster* engine) {
