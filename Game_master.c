@@ -6,53 +6,53 @@
 #include "Game_mechanics.h"
 #include "Input.h"
 #include "UI_manager.h"
+#include <stdio.h>
 
 // ========================================================
 // System entry
 // ========================================================
 int gameMaster() {
-    struct gameMaster engine = {0};
+    struct gameMaster gm = {0};
+    int playerChoice = 0;
+    
+    wakeGameMaster(&gm);
 
-    wakeGameMaster(&engine);
+    while (gm.gameState >= 1) {
+        switch (gm.gameState) {
+            case 1:
+                playerChoice = openMainMenu();
 
-    while (engine.gameState >= 1) {
-        switch (engine.gameState) {
-            
-            case 1: { // Main Menu
-                int playerChoice = openMainMenu();
-                
                 switch (playerChoice) {
-                    case 1:  engine.gameState = 2; break;
-                    case 2:  engine.gameState = 3; break;
-                    case 9:  openDebugMenu(&engine, NULL); break;
-                    case 99: engine.debugMenuEnabled = !engine.debugMenuEnabled; break;
-                    case 0:  engine.gameState = 0; break;
-                    default: break; // Ignore invalid inputs
+                    case 1:
+                        gm.gameState = 2; 
+                        break;
+                    case 2:
+                        gm.gameState = 3; 
+                        break;
+                    case 9:
+                        openDebugMenu(&gm, NULL);
+                        break;
+                    case 99:
+                        gm.debugMenuEnabled = !gm.debugMenuEnabled;
+                        break;
+                    default:
+                        break;
                 }
                 break;
-            }
 
-            case 2: // Active Game
-                gameLoop(&engine);
+            case 2:
+                gameLoop(&gm);
                 break;
 
-            case 3: { // Options Menu
-                int playerChoice = runOptionsScene(engine.debugMenuEnabled);
+            case 3:
+                break;
                 
-                switch (playerChoice) {
-                    case 1:  engine.debugMenuEnabled = !engine.debugMenuEnabled; break;
-                    case 9:  engine.gameState = 1; break;
-                    default: break; 
-                }
-                break;
-            }
-
-            default:
-                engine.gameState = 1;
-                break;
+            case 9:
+                openDebugMenu(&gm, NULL);
+                continue;
         }
     }
-
+    
     return 0;
 }
 
@@ -63,154 +63,113 @@ void wakeGameMaster(struct gameMaster* startingValues) {
     startingValues->debugMenuEnabled = false;
     startingValues->debugOpen = false;
     startingValues->gameState = 1;
-
-    seedRandomNumberGenerator(startingValues);
+    
+    randomNumberGenerator(startingValues);
 }
 
 void gameSetUp(struct game* session) {
     int totalCards = 0;
-
-    setPlayerDefault(&session->playerOne);
-
+    
+    setPlayerDefault(&(session->playerOne));    
     generateCardPool(session, &totalCards);
     buildDeck(session, totalCards);
-
-    session->lastFacedType = EMPTY;
-    session->lastFacedValue = 0;
-
+    
     dealRoomCards(session);
 }
 
 void setPlayerDefault(struct player* playerOne) {
-    playerOne->minimumHealth = 0;
-    playerOne->maximumHealth = 20;
-    playerOne->currentHealth = 20;
-    playerOne->weapon.equippedCard = NULL;
-    playerOne->weapon.killCount = 0;
+    playerOne->minHP = 0;
+    playerOne->maxHP = 20;
+    playerOne->hp = 20;
+    playerOne->weapon.equipped = NULL;
     playerOne->canFlee = true;
-    playerOne->potionUsedThisRoom = false;
 }
 
-void seedRandomNumberGenerator(struct gameMaster* engine) {
+void randomNumberGenerator(struct gameMaster* engine) {
     unsigned int startingSeed = (unsigned int)time(NULL);
+
     srand(startingSeed);
-    engine->randomSeed = startingSeed;
+
+    int rngToSkip = rand() % 100;
+
+    for (int rngIncrementer = 0; rngIncrementer < rngToSkip; rngIncrementer++) {
+        rand();
+    }
+
+    engine->rngSeed = startingSeed;
 }
 
 // ========================================================
 // Game loop managers
 // ========================================================
-void gameLoop(struct gameMaster* engine) {
+void gameLoop(struct gameMaster* gm) {
     struct game session = {0};
     InGameState currentGameState = PLAYING_ACTIVE;
-
-    gameSetUp(&session);
-
+    
+    gameSetUp(&session);        
+    
     while (currentGameState != PLAYING_EXIT) {
         switch (currentGameState) {
             case PLAYING_ACTIVE:
-                currentGameState = activeGameManager(&session, engine);
+                currentGameState = activeGameManger(&session, gm);
                 break;
-
+                
             case PLAYING_PAUSED:
-                currentGameState = activeGamePauseManager();
+                currentGameState = activeGamePauseManger(&session, gm);
                 break;
-
+                
             case PLAYING_OPTIONS:
-                currentGameState = activeGameOptionsManager(engine);
+                currentGameState = activeGameOptionsManger(&session, gm);
                 break;
-
+                
             case PLAYING_GAMEOVER:
-                currentGameState = activeGameOverManager(&session);
+                currentGameState = activeGameOverManger(&session, gm);
                 break;
-
-            case PLAYING_VICTORY:
-                currentGameState = activeGameVictoryManager(&session);
-                break;
-
+                
             case PLAYING_EXIT:
             default:
                 currentGameState = PLAYING_EXIT;
                 break;
         }
     }
-
-    engine->gameState = 1;
+    
+    gm->gameState = 1;
 }
 
 // ========================================================
 // State sub-managers
 // ========================================================
-InGameState activeGameManager(struct game* session, struct gameMaster* engine) {
-    if (isPlayerDead(&session->playerOne)) return PLAYING_GAMEOVER;
-    if (isDungeonCleared(session)) return PLAYING_VICTORY;
+InGameState activeGameManger(struct game* session, struct gameMaster* gm) {
+    struct player* playerOne = &session->playerOne;
 
-    int playerChoice = runActiveGameScene(session, engine->debugMenuEnabled);
+    if (isPlayerDead(playerOne)) {
+        return PLAYING_GAMEOVER;
+    }
 
-    return routePlayerAction(session, playerChoice);
-}
-
-InGameState activeGamePauseManager() {
-    int playerChoice = runPauseScene();
+    PlayerInput playerChoice = (PlayerInput)runActiveGameScene(session);
 
     switch (playerChoice) {
-        case 1:
-            return PLAYING_ACTIVE;
-        case 2:
-            return PLAYING_OPTIONS;
-        case 9:
-            return PLAYING_EXIT;
-        default:
-            return PLAYING_PAUSED;
-    }
-}
-
-InGameState activeGameOptionsManager(struct gameMaster* engine) {
-    int playerChoice = runOptionsScene(engine->debugMenuEnabled);
-
-    if (playerChoice == 1) {
-        engine->debugMenuEnabled = !engine->debugMenuEnabled;
-        return PLAYING_OPTIONS;
-    }
-
-    if (playerChoice == 9) return PLAYING_PAUSED;
-
-    return PLAYING_OPTIONS;
-}
-
-InGameState activeGameOverManager(struct game* session) {
-    runGameOverScene(calculateFinalScore(session));
-    return PLAYING_EXIT;
-}
-
-InGameState activeGameVictoryManager(struct game* session) {
-    runVictoryScene(calculateFinalScore(session));
-    return PLAYING_EXIT;
-}
-
-// ========================================================
-// Player action handlers
-// ========================================================
-InGameState routePlayerAction(struct game* session, int playerChoice) {
-    switch ((PlayerInput)playerChoice) {
         case INPUT_SLOT_0:
         case INPUT_SLOT_1:
         case INPUT_SLOT_2:
         case INPUT_SLOT_3:
-            handleSlotChoice(session, playerChoice - 1);
+            encounterManager(session, playerChoice - 1);
             break;
-
+            
         case INPUT_FLEE:
             fleeManager(session);
             break;
-
+            
         case INPUT_NEXT_ROOM:
-            handleNextRoomChoice(session);
+            if (countCardsInRoom(session) <= 1) {
+                dealRoomCards(session);
+                setCanFleeTrue(playerOne); 
+            }
             break;
-
+            
         case INPUT_PAUSE:
             return PLAYING_PAUSED;
-
+            
         default:
             break;
     }
@@ -218,40 +177,50 @@ InGameState routePlayerAction(struct game* session, int playerChoice) {
     return PLAYING_ACTIVE;
 }
 
-void handleSlotChoice(struct game* session, int slotIndex) {
-    if (isRoomSlotEmpty(session, slotIndex)) return;
+InGameState activeGamePauseManger(struct game* session, struct gameMaster* gm) {
+    clearScreen();
+    printf("=== PAUSED ===\n");
+    printf("1. Resume Game\n");
+    printf("9. Quit to Main Menu\n");
+    printf("=================\n");
+    printf("Select an option: ");
+    
+    int choice = processUserInput();
+    if (choice == 1) return PLAYING_ACTIVE;
+    if (choice == 9) return PLAYING_EXIT;
+    
+    return PLAYING_PAUSED;
+}
 
-    if (mustKeepLastCardForNextRoom(session)) {
-        printLastCardWarning();
-        pressEnterToContinue();
-        return;
+InGameState activeGameOptionsManger(struct game* session, struct gameMaster* gm) {
+    clearScreen();
+    printf("=== OPTIONS ===\n");
+    printf("1. Toggle Debug Menu (Current: %s)\n", gm->debugMenuEnabled ? "ON" : "OFF");
+    printf("9. Back\n");
+    printf("=================\n");
+    printf("Select an option: ");
+    
+    int choice = processUserInput();
+    if (choice == 1) {
+        gm->debugMenuEnabled = !gm->debugMenuEnabled;
+    } else if (choice == 9) {
+        return PLAYING_ACTIVE;
     }
-
-    bool fightBarehanded = resolveFightBarehanded(session, slotIndex);
-
-    EncounterResult result = encounterManager(session, slotIndex, fightBarehanded);
-
-    printEncounterMessage(result);
-    if (result == ENCOUNTER_POTION_FIZZLED) pressEnterToContinue();
+    
+    return PLAYING_OPTIONS;
 }
 
-void handleNextRoomChoice(struct game* session) {
-    if (roomIsReadyToLeave(session) == false) return;
-
-    dealRoomCards(session);
-    setCanFleeTrue(&session->playerOne);
+InGameState activeGameOverManger(struct game* session, struct gameMaster* gm) {
+    clearScreen();
+    printf("\n\n=== GAME OVER ===\n");
+    printf("You have fallen in the dungeon.\n");
+    pressEnterToContinue();
+    return PLAYING_EXIT;
 }
 
-bool resolveFightBarehanded(struct game* session, int slotIndex) {
-    struct player* playerOne = &session->playerOne;
-    struct card* facedCard = session->roomSlots[slotIndex]->data;
-
-    if (facedCard->type != MONSTER) return false;
-    if (weaponIsUsableAgainst(playerOne, facedCard) == false) return false;
-
-    bool useWeapon = askFightWithWeapon(
-        playerOne->weapon.equippedCard->value,
-        facedCard->value);
-
-    return (useWeapon == false);
+// ========================================================
+// Helpers
+// ========================================================
+bool isGameSessionActive(struct game* session) {
+    return (session != NULL);
 }

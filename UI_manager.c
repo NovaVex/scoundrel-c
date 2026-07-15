@@ -1,128 +1,31 @@
 #include "UI_manager.h"
 #include "Data_Structure.h"
+#include "Game_master.h"
+#include <iso646.h>
 #include <stdio.h>
-
-// ========================================================
-// Local word helpers
-// ========================================================
-static const char* yesOrNo(bool state) {
-    if (state) return "YES";
-    return "NO";
-}
-
-static const char* cardTypeName(char type) {
-    if (type == MONSTER) return "Monster";
-    if (type == POTION) return "Potion";
-    if (type == WEAPON) return "Weapon";
-    return "???";
-}
 
 // ========================================================
 // Basic utilities
 // ========================================================
 void clearScreen() {
-    printf("\033[H\033[J");
-}
-
-// ========================================================
-// Player-facing rendering
-// ========================================================
-void renderGameView(struct game* session) {
-    printf("==============================\n");
-    printf("          SCOUNDREL           \n");
-    printf("==============================\n");
-
-    printHealthLine(&session->playerOne, session->mainDeck.count);
-    printWeaponLine(&session->playerOne.weapon);
-
-    printf("------------------------------\n");
-    printf("THE ROOM:\n");
-    printRoomSlots(session);
-    printf("==============================\n");
-}
-
-void printHealthLine(struct player* activePlayer, int cardsInDeck) {
-    printf("HP: %d/%d   |   Dungeon: %d cards\n",
-        activePlayer->currentHealth,
-        activePlayer->maximumHealth,
-        cardsInDeck);
-}
-
-void printWeaponLine(struct weapon* playerWeapon) {
-    if (playerWeapon->equippedCard == NULL) {
-        printf("Weapon: [UNARMED]\n");
-        return;
-    }
-
-    if (playerWeapon->killCount == 0) {
-        printf("Weapon: %d (fresh)\n", playerWeapon->equippedCard->value);
-        return;
-    }
-
-    int lastKillIndex = playerWeapon->killCount - 1;
-    int lastKillValue = playerWeapon->monsterStack[lastKillIndex]->value;
-
-    printf("Weapon: %d (can only fight monsters of %d or weaker)\n",
-        playerWeapon->equippedCard->value,
-        lastKillValue);
-}
-
-void printRoomSlots(struct game* session) {
-    for (int slotIndex = 0; slotIndex < MAX_ROOM_SIZE; slotIndex++) {
-        CardLink* slotLink = session->roomSlots[slotIndex];
-
-        if (slotLink == NULL) {
-            printf("  Slot %d: [EMPTY]\n", slotIndex + 1);
-            continue;
-        }
-
-        printf("  Slot %d: %s (%d)\n",
-            slotIndex + 1,
-            cardTypeName(slotLink->data->type),
-            slotLink->data->value);
-    }
-}
-
-// ========================================================
-// Player-facing messages
-// ========================================================
-void printEncounterMessage(EncounterResult result) {
-    if (result == ENCOUNTER_POTION_FIZZLED) {
-        printf("\nThe second potion this turn fizzles away... (no effect)\n");
-        return;
-    }
-
-}
-
-void printLastCardWarning() {
-    printf("\nThe last card belongs to the next room. Move on! (8)\n");
-}
-
-void printGameOverScreen(int finalScore) {
-    printf("\n\n=== GAME OVER ===\n");
-    printf("You have fallen in the dungeon.\n");
-    printf("Final Score: %d\n", finalScore);
-}
-
-void printVictoryScreen(int finalScore) {
-    printf("\n\n=== VICTORY ===\n");
-    printf("You cleared the entire dungeon!\n");
-    printf("Final Score: %d\n", finalScore);
+    printf("\033[H\033[J"); 
 }
 
 // ========================================================
 // Debug printing (targeted)
 // ========================================================
 void printCurrentPlayerStats(struct game* activeSession) {
-    struct player* activePlayer = &activeSession->playerOne;
-
+    struct player* p1 = &activeSession->playerOne;
+    struct card* equippedWeapon = p1->weapon.equipped;
+    
     int currentWeaponValue = 0;
-    if (activePlayer->weapon.equippedCard != NULL) {
-        currentWeaponValue = activePlayer->weapon.equippedCard->value;
+    
+    if (equippedWeapon != NULL) {
+        currentWeaponValue = equippedWeapon->value;
     }
 
-    printf("Max HP: %d\n", activePlayer->maximumHealth);
-    printf("Current HP: %d\n", activePlayer->currentHealth);
+    printf("Max HP: %d\n", p1->maxHP);
+    printf("Current HP: %d\n", p1->hp);
     printf("Weapon Value: %d\n", currentWeaponValue);
 }
 
@@ -137,17 +40,17 @@ void printEntireDeckLoop(Zone* pile) {
 
     while (currentLink != NULL) {
         struct card* cardData = currentLink->data;
-
-        printf("Position: %d | Card ID: %d | Type: %c | Value: %d\n",
-            position,
-            cardData->identifier,
-            cardData->type,
+        
+        printf("Position: %d | Card ID: %d | Type: %c | Value: %d\n", 
+            position, 
+            cardData->id, 
+            cardData->type, 
             cardData->value);
-
+            
         currentLink = currentLink->next;
         position++;
     }
-
+    
     printf("--- END OF PILE ---\n");
 }
 
@@ -155,56 +58,86 @@ void printEntireDeckLoop(Zone* pile) {
 // Debug tools (session level)
 // ========================================================
 void printSessionDeck(struct game* activeSession) {
-    if (activeSession == NULL) {
+    if (!isGameSessionActive(activeSession)) {
         printf("ERROR: No active game session is currently running!\n");
         return;
     }
 
-    printEntireDeckLoop(&activeSession->mainDeck);
+    Zone* deck = &activeSession->mainDeck;
+    printEntireDeckLoop(deck);
 }
 
 void printDungeonRoom(struct game* activeSession) {
-    if (activeSession == NULL) {
+    if (!isGameSessionActive(activeSession)) {
         printf("ERROR: No active game session is currently running!\n");
         return;
     }
 
-    for (int slotIndex = 0; slotIndex < MAX_ROOM_SIZE; slotIndex++) {
-        CardLink* slotLink = activeSession->roomSlots[slotIndex];
-
+    for (int i = 0; i < MAX_ROOM_SIZE; i++) {
+        CardLink* slotLink = (CardLink*)activeSession->roomSlots[i];
+        
         if (slotLink == NULL) {
-            printf("Dungeon Slot %d | [EMPTY]\n", slotIndex + 1);
-            continue;
+            printf("Dungeon Slot %d | [EMPTY]\n", i + 1);
+        } else {
+            struct card* cardData = slotLink->data;
+            printf("Dungeon Slot %d | Card ID: %d | Type: %c | Value: %d\n",
+                i + 1,
+                cardData->id,
+                cardData->type,
+                cardData->value);
         }
-
-        struct card* cardData = slotLink->data;
-        printf("Dungeon Slot %d | Card ID: %d | Type: %c | Value: %d\n",
-            slotIndex + 1,
-            cardData->identifier,
-            cardData->type,
-            cardData->value);
     }
-
+    
     printf("--- END OF ROOM ---\n");
 }
 
 // ========================================================
 // Master debug renderer
 // ========================================================
-void debugRender(struct game* session) {
-    struct player* activePlayer = &session->playerOne;
-    struct weapon* playerWeapon = &activePlayer->weapon;
-
+void debugRender(struct game* game) {
+    struct player* p1 = &game->playerOne;
+    struct weapon* wpn = &p1->weapon;
+    Zone* deck = &game->mainDeck;
+    
     printf("\n=== SCOUNDREL DEBUG VIEW ===\n");
-    printf("HP: %d/%d\n", activePlayer->currentHealth, activePlayer->maximumHealth);
+    
+    printf("HP: %d/%d\n", p1->hp, p1->maxHP);
+    
+    if (wpn->equipped == NULL) {
+        printf("Weapon: [UNARMED]\n");
+    } else {
+        int weaponValue = wpn->equipped->value;
+        int kills = wpn->killCount;
+        
+        if (kills == 0) {
+            printf("Weapon Value: %d | Last Kill: [NONE]\n", weaponValue);
+        } else {
+            int lastKillIndex = kills - 1;
+            struct card* lastKilledMonster = wpn->monsterStack[lastKillIndex];
+            
+            printf("Weapon Value: %d | Last Kill: %d\n", weaponValue, lastKilledMonster->value);
+        }
+    }
 
-    printWeaponLine(playerWeapon);
-
-    printf("Cards in Deck: %d\n", session->mainDeck.count);
-    printf("Potion used this room? %s\n", yesOrNo(activePlayer->potionUsedThisRoom));
-    printf("Can Flee Room? %s\n", yesOrNo(activePlayer->canFlee));
+    printf("Cards in Deck: %d\n", deck->count);
+    
+    if (p1->canFlee) {
+        printf("Can Flee Room? YES\n");
+    } else {
+        printf("Can Flee Room? NO\n");
+    }
+    
     printf("----------------------------\n");
-
-    printRoomSlots(session);
+    
+    for (int i = 0; i < MAX_ROOM_SIZE; i++) {
+        CardLink* slotLink = (CardLink*)game->roomSlots[i];
+        
+        if (slotLink == NULL) {
+            printf("Slot %d: [EMPTY]\n", i + 1);
+        } else {
+            struct card* slotCard = slotLink->data;
+            printf("Slot %d: [%d of %c]\n", i + 1, slotCard->value, slotCard->type);
+        }
+    }
     printf("============================\n");
 }

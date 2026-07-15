@@ -6,35 +6,28 @@
 #define MAX_MONSTER_WEAPON_STACK 13
 
 typedef enum {
-    WEAPON_NONE,
-    WEAPON_FRESH,
-    WEAPON_VALID_COMBO,
-    WEAPON_INVALID_COMBO
+    WEAPON_NONE,           
+    WEAPON_FRESH,          
+    WEAPON_VALID_COMBO,    
+    WEAPON_INVALID_COMBO   
 } WeaponState;
 
 typedef enum {
-    EMPTY   = 'E',
+    EMPTY = 'E',
     MONSTER = 'M',
-    POTION  = 'P',
-    WEAPON  = 'W'
+    POTION = 'P',
+    WEAPON = 'W',
+    FLEE = 'F'
 } EncounterType;
 
 typedef enum {
-    ENCOUNTER_NOTHING,
-    ENCOUNTER_MONSTER_FOUGHT,
-    ENCOUNTER_POTION_HEALED,
-    ENCOUNTER_POTION_FIZZLED,
-    ENCOUNTER_WEAPON_EQUIPPED
-} EncounterResult;
-
-typedef enum {
-    INPUT_SLOT_0    = 1,
-    INPUT_SLOT_1    = 2,
-    INPUT_SLOT_2    = 3,
-    INPUT_SLOT_3    = 4,
-    INPUT_FLEE      = 5,
+    INPUT_SLOT_0 = 1,
+    INPUT_SLOT_1 = 2,
+    INPUT_SLOT_2 = 3,
+    INPUT_SLOT_3 = 4,
+    INPUT_FLEE = 5,
     INPUT_NEXT_ROOM = 8,
-    INPUT_PAUSE     = 9
+    INPUT_PAUSE = 9
 } PlayerInput;
 
 typedef enum {
@@ -42,26 +35,25 @@ typedef enum {
     PLAYING_PAUSED,
     PLAYING_OPTIONS,
     PLAYING_GAMEOVER,
-    PLAYING_VICTORY,
     PLAYING_EXIT
 } InGameState;
 
 struct gameMaster {
     bool debugMenuEnabled;
     bool debugOpen;
-    int gameState;
-    unsigned int randomSeed;
+    int gameState; 
+    int rngSeed;
 };
 
 struct card {
-    int identifier;
-    char type;
+    int id;
+    char type; 
     int value;
 };
 
 typedef struct CardLink {
     struct card* data;
-    struct CardLink* next;
+    struct CardLink* next; 
 } CardLink;
 
 typedef struct {
@@ -71,28 +63,25 @@ typedef struct {
 } Zone;
 
 struct weapon {
-    struct card* equippedCard;
+    struct card* equipped;
     struct card* monsterStack[MAX_MONSTER_WEAPON_STACK];
     int killCount;
 };
 
 struct player {
-    int minimumHealth;
-    int maximumHealth;
-    int currentHealth;
+    int minHP;
+    int maxHP;
+    int hp;
     struct weapon weapon;
     bool canFlee;
-    bool potionUsedThisRoom;
 };
 
 struct game {
+    struct gameMaster gm;
     struct card globalCardPool[DECK_SIZE];
     CardLink nodePool[DECK_SIZE];
     Zone mainDeck;
     Zone discardPile;
     CardLink* roomSlots[MAX_ROOM_SIZE];
     struct player playerOne;
-
-    char lastFacedType;
-    int  lastFacedValue;
 };

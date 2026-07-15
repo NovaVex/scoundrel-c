@@ -1,6 +1,7 @@
 #pragma once
 #include <stdbool.h>
 #include "Data_Structure.h"
+#include "Game_master.h"
 
 // ========================================================
 // System entry
@@ -13,26 +14,22 @@ int gameMaster();
 void wakeGameMaster(struct gameMaster* startingValues);
 void gameSetUp(struct game* session);
 void setPlayerDefault(struct player* playerOne);
-void seedRandomNumberGenerator(struct gameMaster* engine);
+void randomNumberGenerator(struct gameMaster* engine);
 
 // ========================================================
 // Game loop managers
 // ========================================================
-void gameLoop(struct gameMaster* engine);
+void gameLoop(struct gameMaster* gm);
 
 // ========================================================
 // State sub-managers
 // ========================================================
-InGameState activeGameManager(struct game* session, struct gameMaster* engine);
-InGameState activeGamePauseManager();
-InGameState activeGameOptionsManager(struct gameMaster* engine);
-InGameState activeGameOverManager(struct game* session);
-InGameState activeGameVictoryManager(struct game* session);
+InGameState activeGameManger(struct game* session, struct gameMaster* gm);
+InGameState activeGamePauseManger(struct game* session, struct gameMaster* gm);
+InGameState activeGameOptionsManger(struct game* session, struct gameMaster* gm);
+InGameState activeGameOverManger(struct game* session, struct gameMaster* gm);
 
 // ========================================================
-// Player action handlers
+// Helpers
 // ========================================================
-InGameState routePlayerAction(struct game* session, int playerChoice);
-void handleSlotChoice(struct game* session, int slotIndex);
-void handleNextRoomChoice(struct game* session);
-bool resolveFightBarehanded(struct game* session, int slotIndex);
+bool isGameSessionActive(struct game* session);
