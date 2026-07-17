@@ -140,6 +140,7 @@ void gameLoop(struct gameMaster* gm) {
 // State sub-managers
 // ========================================================
 InGameState activeGameManger(struct game* session, struct gameMaster* gm) {
+    (void)gm;
     struct player* playerOne = &session->playerOne;
 
     if (isPlayerDead(playerOne)) {
@@ -178,6 +179,8 @@ InGameState activeGameManger(struct game* session, struct gameMaster* gm) {
 }
 
 InGameState activeGamePauseManger(struct game* session, struct gameMaster* gm) {
+    (void)session;
+    (void)gm;
     clearScreen();
     printf("=== PAUSED ===\n");
     printf("1. Resume Game\n");
@@ -193,6 +196,7 @@ InGameState activeGamePauseManger(struct game* session, struct gameMaster* gm) {
 }
 
 InGameState activeGameOptionsManger(struct game* session, struct gameMaster* gm) {
+    (void)session;
     clearScreen();
     printf("=== OPTIONS ===\n");
     printf("1. Toggle Debug Menu (Current: %s)\n", gm->debugMenuEnabled ? "ON" : "OFF");
@@ -211,6 +215,8 @@ InGameState activeGameOptionsManger(struct game* session, struct gameMaster* gm)
 }
 
 InGameState activeGameOverManger(struct game* session, struct gameMaster* gm) {
+    (void)session;
+    (void)gm;
     clearScreen();
     printf("\n\n=== GAME OVER ===\n");
     printf("You have fallen in the dungeon.\n");
