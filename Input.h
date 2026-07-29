@@ -3,9 +3,9 @@
 // ========================================================
 // Input processing
 // ========================================================
-int processUserInput();
+int processUserInput(void);
 
 // ========================================================
 // Utilities
 // ========================================================
-void pressEnterToContinue();
+void pressEnterToContinue(void);

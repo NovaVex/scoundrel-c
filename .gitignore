@@ -1,0 +1,5 @@
+scoundrel
+scoundrel.exe
+*.o
+
+.claude/settings.local.json

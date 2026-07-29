@@ -3,7 +3,7 @@
 #include "Data_Structure.h"
 
 // ========================================================
-// Card Manipulation 
+// Card Manipulation
 // ========================================================
 CardLink* drawTopCard(Zone* pile);
 void placeAtBottom(Zone* pile, CardLink* card);
@@ -11,34 +11,59 @@ void placeAtBottom(Zone* pile, CardLink* card);
 // ========================================================
 // Builders
 // ========================================================
-void generateCardPool(struct game* game, int* outTotalCards);
+void generateCardPool(Game* game, int* outTotalCards);
 void cardShuffle(CardLink** cardArray, int totalCards);
-void buildDeck(struct game* game, int totalCards);
+void buildDeck(Game* game, int totalCards);
+void setPlayerDefault(Player* playerOne);
 
 // ========================================================
 // Managers
 // ========================================================
-void dealRoomCards(struct game* game);
-void fleeManager(struct game* game);
-void encounterManager(struct game* game, int chosenSlot);
-void combatManager(struct player* player, struct card* monster);
-void healManager(struct player* player, struct card* potion);
-void equipWeapon(struct player* player, struct card* encounterWeapon);
+void dealRoomCards(Game* game);
+void advanceToNextRoom(Game* game);
+FleeResult fleeManager(Game* game);
+EncounterResult encounterManager(Game* game, int chosenSlot, CombatChoice combatChoice);
+void combatManager(Player* player, CardLink* monsterLink, Zone* discardPile, CombatChoice combatChoice);
+void healManager(Player* player, CardLink* potionLink, Zone* discardPile);
+void equipWeapon(Player* player, CardLink* weaponLink, Zone* discardPile);
+void discardEquippedWeapon(Player* player, Zone* discardPile);
+
+// ========================================================
+// Scoring
+// ========================================================
+int calculateFinalScore(Game* game);
+int sumRemainingMonsterValues(Zone* pile);
+bool hasPotionVictoryBonus(Game* game);
 
 // ========================================================
 // Helpers
 // ========================================================
-bool isRoomSlotEmpty(struct game* game, int slotIndex);
-bool isPlayerDead(struct player* player);
-int decideDamageValue(struct player* player, struct card* monster);
-WeaponState checkWeaponState(struct player* player, struct card* monster);
-int clampedDamageToPlayer(int rawHp, int minHp, int maxHp, int rawDamageDealt);
-int damageCalculation(int currentHP, int damageTaken);
-int healCalculation(int currentHp, int healValue);
-int clampedPlayerHeal(int rawHp, int minHp, int maxHp, int rawHeal);
-void setPlayerHealth(struct player* player, int valueToSet);
-int clamp(int value, int min, int max);
+bool isRoomSlotEmpty(Game* game, int slotIndex);
+bool isPlayerDead(Player* player);
+bool isDungeonCleared(Game* game);
+bool isGameOver(Game* game);
+bool canEncounterCards(Game* game);
+bool isRoomComplete(Game* game);
+bool isGameSessionActive(Game* game);
+int decideDamageValue(Player* player, Card* monster, CombatChoice combatChoice);
+WeaponState checkWeaponState(Player* player, Card* monster);
+bool weaponUsableOnMonster(Player* player, Card* monster);
+bool willUseWeapon(Player* player, Card* monster, CombatChoice combatChoice);
+EncounterPrompt requiredEncounterPrompt(Game* game, int slotIndex);
+int getSlotCardValue(Game* game, int slotIndex);
+int previewDamageTaken(Game* game, int slotIndex, CombatChoice combatChoice);
+int pendingWeaponDiscardCount(Player* player);
+bool wouldPotionBeWasted(Player* player);
+int clampedDamageToPlayer(int rawHealth, int minHealth, int maxHealth, int rawDamageDealt);
+int damageCalculation(int currentHealth, int damageTaken);
+int healCalculation(int currentHealth, int healValue);
+int clampedPlayerHeal(int rawHealth, int minHealth, int maxHealth, int rawHeal);
+void setPlayerHealth(Player* player, int valueToSet);
+int clamp(int value, int minimum, int maximum);
 int preventNegative(int value);
-void setCanFleeFalse(struct player* player);
-void setCanFleeTrue(struct player* player);
-int countCardsInRoom(struct game* game);
+void setCanFleeFalse(Player* player);
+void setCanFleeTrue(Player* player);
+void startNewTurn(Player* player);
+int countCardsInRoom(Game* game);
+int getEquippedWeaponValue(Player* player);
+int getLastKillValue(Player* player);

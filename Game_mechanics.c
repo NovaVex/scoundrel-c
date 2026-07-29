@@ -1,53 +1,82 @@
+// ========================================================
+// Game_mechanics.c
+// --------------------------------------------------------
+// JOB
+//   The rules. This is the file that actually knows how
+//   Scoundrel is played. It is the only file that changes
+//   game state.
+//
+// THE HARD RULE
+//   No stdio. No printf. Not one. If this file needs to tell
+//   the player something, it returns a value and lets the
+//   layers above decide how to say it. That is what keeps it
+//   portable into a game engine later.
+//
+// WHO CALLS THIS FILE
+//   Game_master.c    to run turns
+//   Scene_manager.c  to ask what is legal before asking the player
+//   UI_manager.c     to ask for numbers to display (read only)
+//
+// MAP OF THIS FILE, IN ORDER
+//   CARD MANIPULATION  moving cards between piles
+//   BUILDERS           making the deck and the starting player
+//   MANAGERS           the ones that resolve a turn:
+//                      encounterManager, combatManager,
+//                      healManager, equipWeapon, fleeManager
+//   SCORING            final score at game over
+//   HELPERS            the questions. Most are one line and
+//                      answer exactly one thing. This is the
+//                      long section, but nothing in it is deep.
+// ========================================================
+
 #include "Game_mechanics.h"
 #include "Data_Structure.h"
 #include <stdlib.h>
-#include <stdio.h>
 
 // ========================================================
-// Card Manipulation 
+// Card Manipulation
 // ========================================================
 CardLink* drawTopCard(Zone* pile) {
     if (pile->count == 0) return NULL;
 
     CardLink* drawnCard = pile->topCard;
-    
+
     pile->topCard = drawnCard->next;
     pile->count--;
-    drawnCard->next = NULL; 
-    
+    drawnCard->next = NULL;
+
     if (pile->count == 0) pile->bottomCard = NULL;
-    
+
     return drawnCard;
 }
 
 void placeAtBottom(Zone* pile, CardLink* card) {
     if (card == NULL) return;
 
+    card->next = NULL;
+
     if (pile->count == 0) {
         pile->topCard = card;
-        pile->bottomCard = (void*)card;
+        pile->bottomCard = card;
         pile->count++;
         return;
     }
 
-    CardLink* currentBottom = (CardLink*)pile->bottomCard;
-    
-    currentBottom->next = card;
-    pile->bottomCard = (void*)card;
-    
+    pile->bottomCard->next = card;
+    pile->bottomCard = card;
     pile->count++;
 }
 
 // ========================================================
 // Builders
 // ========================================================
-void generateCardPool(struct game* game, int* outTotalCards) {
+void generateCardPool(Game* game, int* outTotalCards) {
     int cardValueGenerator = 2;
-    int deckIncrementer; 
+    int deckIncrementer;
 
     for (deckIncrementer = 0; deckIncrementer < 26; deckIncrementer++) {
-        if (cardValueGenerator == 15) cardValueGenerator = 2; 
-        
+        if (cardValueGenerator == 15) cardValueGenerator = 2;
+
         game->globalCardPool[deckIncrementer].id = deckIncrementer + 1;
         game->globalCardPool[deckIncrementer].type = MONSTER;
         game->globalCardPool[deckIncrementer].value = cardValueGenerator++;
@@ -82,232 +111,432 @@ void cardShuffle(CardLink** cardArray, int totalCards) {
     }
 }
 
-void buildDeck(struct game* game, int totalCards) {
+void buildDeck(Game* game, int totalCards) {
     CardLink* shuffleArray[DECK_SIZE];
-    
+
+    if (totalCards <= 0 || totalCards > DECK_SIZE) return;
+
     for (int currentSlot = 0; currentSlot < totalCards; currentSlot++) {
-        CardLink* currentLink = (CardLink*)&game->nodePool[currentSlot];
-        
+        CardLink* currentLink = &game->nodePool[currentSlot];
+
         currentLink->data = &game->globalCardPool[currentSlot];
         currentLink->next = NULL;
-        
+
         shuffleArray[currentSlot] = currentLink;
     }
 
     cardShuffle(shuffleArray, totalCards);
 
     game->mainDeck.topCard = shuffleArray[0];
-    
+
     for (int currentSlot = 0; currentSlot < totalCards - 1; currentSlot++) {
         CardLink* currentCard = shuffleArray[currentSlot];
         CardLink* cardDirectlyBeneath = shuffleArray[currentSlot + 1];
-        
+
         currentCard->next = cardDirectlyBeneath;
     }
-    
+
     int lastCardIndex = totalCards - 1;
     shuffleArray[lastCardIndex]->next = NULL;
 
-    game->mainDeck.bottomCard = (void*)shuffleArray[lastCardIndex];
+    game->mainDeck.bottomCard = shuffleArray[lastCardIndex];
     game->mainDeck.count = totalCards;
+}
+
+void setPlayerDefault(Player* playerOne) {
+    playerOne->minHealth = MINIMUM_HEALTH;
+    playerOne->maxHealth = STARTING_HEALTH;
+    playerOne->health = STARTING_HEALTH;
+    playerOne->canFlee = true;
+    playerOne->potionUsedThisTurn = false;
+
+    playerOne->weapon.equipped = NULL;
+    playerOne->weapon.killCount = 0;
+
+    for (int stackIndex = 0; stackIndex < MAX_MONSTER_WEAPON_STACK; stackIndex++) {
+        playerOne->weapon.monsterStack[stackIndex] = NULL;
+    }
 }
 
 // ========================================================
 // Managers
 // ========================================================
-void dealRoomCards(struct game* game) {
+void dealRoomCards(Game* game) {
     Zone* deck = &game->mainDeck;
-    
+
     for (int roomSlot = 0; roomSlot < MAX_ROOM_SIZE; roomSlot++) {
         if (deck->count == 0) return;
 
         if (isRoomSlotEmpty(game, roomSlot)) {
-            CardLink* drawnCard = drawTopCard(deck);
-            game->roomSlots[roomSlot] = (void*)drawnCard;
+            game->roomSlots[roomSlot] = drawTopCard(deck);
         }
     }
 }
 
-void fleeManager(struct game* game) {
-    if (game->playerOne.canFlee == false) {
-        return; 
-    }
-    
-    for (int i = 0; i < MAX_ROOM_SIZE; i++) {
-        if (!isRoomSlotEmpty(game, i)) {
-            placeAtBottom(&game->mainDeck, (CardLink*)game->roomSlots[i]);
-            game->roomSlots[i] = NULL;
-        }
-    }
-    
-    setCanFleeFalse(&(game->playerOne));
-    
+void advanceToNextRoom(Game* game) {
     dealRoomCards(game);
+    startNewTurn(&game->playerOne);
+    setCanFleeTrue(&game->playerOne);
 }
 
-void encounterManager(struct game* game, int chosenSlot) {
-    if (isRoomSlotEmpty(game, chosenSlot)) return;
+FleeResult fleeManager(Game* game) {
+    if (game->playerOne.canFlee == false) return FLEE_BLOCKED;
 
-    CardLink* cardLinkOnTable = (CardLink*)game->roomSlots[chosenSlot];
-    struct card* actualCard = cardLinkOnTable->data;
-    
-    struct player* player = &game->playerOne;
+    for (int roomSlot = 0; roomSlot < MAX_ROOM_SIZE; roomSlot++) {
+        if (isRoomSlotEmpty(game, roomSlot)) continue;
+
+        placeAtBottom(&game->mainDeck, game->roomSlots[roomSlot]);
+        game->roomSlots[roomSlot] = NULL;
+    }
+
+    dealRoomCards(game);
+    startNewTurn(&game->playerOne);
+    setCanFleeFalse(&game->playerOne);
+
+    return FLEE_RESOLVED;
+}
+
+EncounterResult encounterManager(Game* game, int chosenSlot, CombatChoice combatChoice) {
+    if (!canEncounterCards(game)) return ENCOUNTER_BLOCKED_ROOM_NOT_CLEARED;
+    if (isRoomSlotEmpty(game, chosenSlot)) return ENCOUNTER_BLOCKED_EMPTY_SLOT;
+
+    CardLink* cardLinkOnTable = game->roomSlots[chosenSlot];
+    Card* actualCard = cardLinkOnTable->data;
+
+    Player* player = &game->playerOne;
     Zone* discardPile = &game->discardPile;
-    
+
     setCanFleeFalse(player);
-    
+
+    game->roomSlots[chosenSlot] = NULL;
+    game->lastResolvedCard = actualCard;
+
     switch (actualCard->type) {
         case MONSTER:
-            combatManager(player, actualCard);
+            combatManager(player, cardLinkOnTable, discardPile, combatChoice);
             break;
-            
+
         case POTION:
-            healManager(player, actualCard);
+            healManager(player, cardLinkOnTable, discardPile);
             break;
-            
+
         case WEAPON:
-            equipWeapon(player, actualCard);
+            equipWeapon(player, cardLinkOnTable, discardPile);
+            break;
+
+        default:
+            placeAtBottom(discardPile, cardLinkOnTable);
             break;
     }
-    
-    placeAtBottom(discardPile, cardLinkOnTable);
-    game->roomSlots[chosenSlot] = NULL; 
+
+    return ENCOUNTER_RESOLVED;
 }
 
-void combatManager(struct player* player, struct card* monster) {
-	
-    WeaponState currentState = checkWeaponState(player, monster);
-    
-    int damageTaken = decideDamageValue(player, monster);
-    int newHp = clampedDamageToPlayer(player->hp, player->minHP, player->maxHP, damageTaken);
-    setPlayerHealth(player, newHp);
-    
-    if (currentState == WEAPON_FRESH || currentState == WEAPON_VALID_COMBO) {
-        int killIndex = player->weapon.killCount;
-        
-        if (killIndex < MAX_MONSTER_WEAPON_STACK) {
-            player->weapon.monsterStack[killIndex] = monster;
-            player->weapon.killCount++;
-        }
+void combatManager(Player* player, CardLink* monsterLink, Zone* discardPile, CombatChoice combatChoice) {
+    Card* monster = monsterLink->data;
+    bool useWeapon = willUseWeapon(player, monster, combatChoice);
+
+    int damageTaken = decideDamageValue(player, monster, combatChoice);
+    int newHealth = clampedDamageToPlayer(player->health, player->minHealth, player->maxHealth, damageTaken);
+
+    setPlayerHealth(player, newHealth);
+
+    if (!useWeapon) {
+        placeAtBottom(discardPile, monsterLink);
+        return;
     }
+
+    if (player->weapon.killCount >= MAX_MONSTER_WEAPON_STACK) {
+        placeAtBottom(discardPile, monsterLink);
+        return;
+    }
+
+    player->weapon.monsterStack[player->weapon.killCount] = monsterLink;
+    player->weapon.killCount++;
 }
 
-void healManager(struct player* player, struct card* potion) {
-    int healValue = potion->value;
-    int playerHp = player->hp;
-    
-    playerHp = clampedPlayerHeal(playerHp, player->minHP, player->maxHP, healValue);
-    setPlayerHealth(player, playerHp);
+void healManager(Player* player, CardLink* potionLink, Zone* discardPile) {
+    if (player->potionUsedThisTurn) {
+        placeAtBottom(discardPile, potionLink);
+        return;
+    }
+
+    int healValue = potionLink->data->value;
+    int newHealth = clampedPlayerHeal(player->health, player->minHealth, player->maxHealth, healValue);
+
+    setPlayerHealth(player, newHealth);
+    player->potionUsedThisTurn = true;
+
+    placeAtBottom(discardPile, potionLink);
 }
 
-void equipWeapon(struct player* player, struct card* encounterWeapon) {
+void equipWeapon(Player* player, CardLink* weaponLink, Zone* discardPile) {
+    discardEquippedWeapon(player, discardPile);
+
+    player->weapon.equipped = weaponLink;
     player->weapon.killCount = 0;
-    player->weapon.equipped = encounterWeapon; 
+}
+
+void discardEquippedWeapon(Player* player, Zone* discardPile) {
+    if (player->weapon.equipped == NULL) return;
+
+    for (int stackIndex = 0; stackIndex < player->weapon.killCount; stackIndex++) {
+        placeAtBottom(discardPile, player->weapon.monsterStack[stackIndex]);
+        player->weapon.monsterStack[stackIndex] = NULL;
+    }
+
+    placeAtBottom(discardPile, player->weapon.equipped);
+
+    player->weapon.equipped = NULL;
+    player->weapon.killCount = 0;
+}
+
+// ========================================================
+// Scoring
+// ========================================================
+int calculateFinalScore(Game* game) {
+    Player* player = &game->playerOne;
+
+    if (isPlayerDead(player)) {
+        return -sumRemainingMonsterValues(&game->mainDeck);
+    }
+
+    if (hasPotionVictoryBonus(game)) {
+        return player->health + game->lastResolvedCard->value;
+    }
+
+    return player->health;
+}
+
+int sumRemainingMonsterValues(Zone* pile) {
+    int runningTotal = 0;
+    CardLink* currentLink = pile->topCard;
+
+    while (currentLink != NULL) {
+        if (currentLink->data->type == MONSTER) {
+            runningTotal += currentLink->data->value;
+        }
+        currentLink = currentLink->next;
+    }
+
+    return runningTotal;
+}
+
+bool hasPotionVictoryBonus(Game* game) {
+    if (game->lastResolvedCard == NULL) return false;
+    if (game->lastResolvedCard->type != POTION) return false;
+    if (game->playerOne.health != game->playerOne.maxHealth) return false;
+
+    return true;
 }
 
 // ========================================================
 // Helpers
 // ========================================================
-bool isRoomSlotEmpty(struct game* game, int slotIndex) {
-    if (game->roomSlots[slotIndex] == NULL) {
-        return true;
-    }
+bool isRoomSlotEmpty(Game* game, int slotIndex) {
+    return (game->roomSlots[slotIndex] == NULL);
+}
+
+bool isPlayerDead(Player* player) {
+    return (player->health <= 0);
+}
+
+bool isDungeonCleared(Game* game) {
+    if (game->mainDeck.count > 0) return false;
+    if (countCardsInRoom(game) > 0) return false;
+
+    return true;
+}
+
+bool isGameOver(Game* game) {
+    if (isPlayerDead(&game->playerOne)) return true;
+
+    return isDungeonCleared(game);
+}
+
+bool canEncounterCards(Game* game) {
+    if (countCardsInRoom(game) > 1) return true;
+    if (game->mainDeck.count == 0) return true;
+
     return false;
 }
 
-bool isPlayerDead(struct player* player) {
-    int playerHp = player->hp;
-    if(playerHp <= 0) { return true; }    
-    return false;
+bool isRoomComplete(Game* game) {
+    if (isGameOver(game)) return false;
+
+    return !canEncounterCards(game);
 }
 
-int decideDamageValue(struct player* player, struct card* monster) {
-    int damageDealt = 0;
+bool isGameSessionActive(Game* game) {
+    return (game != NULL);
+}
+
+int decideDamageValue(Player* player, Card* monster, CombatChoice combatChoice) {
     WeaponState currentState = checkWeaponState(player, monster);
-    
-    switch(currentState) {
+
+    switch (currentState) {
         case WEAPON_FRESH:
         case WEAPON_VALID_COMBO:
+            if (combatChoice == COMBAT_CHOICE_BARE_HANDED) return monster->value;
+            return monster->value - getEquippedWeaponValue(player);
 
-            damageDealt = monster->value - player->weapon.equipped->value;
-            break;
-            
         case WEAPON_NONE:
         case WEAPON_INVALID_COMBO:
-            damageDealt = monster->value;
-            break;
+        default:
+            return monster->value;
     }
-    return damageDealt;
 }
 
-WeaponState checkWeaponState(struct player* player, struct card* monster) {
-    if (player->weapon.equipped == NULL || player->weapon.equipped->value == 0) {
-        return WEAPON_NONE;
-    }
-    
-    if (player->weapon.killCount == 0) {       
-        return WEAPON_FRESH;
-    }
-    
-    int lastKillIndex = player->weapon.killCount - 1;
-    lastKillIndex = preventNegative(lastKillIndex);
-    
-    if (monster->value < player->weapon.monsterStack[lastKillIndex]->value) {
-        return WEAPON_VALID_COMBO;
-    }
-    
+WeaponState checkWeaponState(Player* player, Card* monster) {
+    if (player->weapon.equipped == NULL) return WEAPON_NONE;
+    if (player->weapon.killCount == 0) return WEAPON_FRESH;
+
+    if (monster->value <= getLastKillValue(player)) return WEAPON_VALID_COMBO;
+
     return WEAPON_INVALID_COMBO;
 }
 
-int clampedDamageToPlayer(int rawHp, int minHp, int maxHp, int rawDamageDealt) {
+bool willUseWeapon(Player* player, Card* monster, CombatChoice combatChoice) {
+    if (combatChoice != COMBAT_CHOICE_USE_WEAPON) return false;
+
+    return weaponUsableOnMonster(player, monster);
+}
+
+bool weaponUsableOnMonster(Player* player, Card* monster) {
+    WeaponState currentState = checkWeaponState(player, monster);
+
+    switch (currentState) {
+        case WEAPON_FRESH:
+        case WEAPON_VALID_COMBO:
+            return true;
+
+        case WEAPON_NONE:
+        case WEAPON_INVALID_COMBO:
+        default:
+            return false;
+    }
+}
+
+EncounterPrompt requiredEncounterPrompt(Game* game, int slotIndex) {
+    if (isRoomSlotEmpty(game, slotIndex)) return ENCOUNTER_PROMPT_NONE;
+
+    Player* player = &game->playerOne;
+    Card* chosenCard = game->roomSlots[slotIndex]->data;
+
+    switch (chosenCard->type) {
+        case MONSTER:
+            if (weaponUsableOnMonster(player, chosenCard)) return ENCOUNTER_PROMPT_COMBAT_CHOICE;
+            return ENCOUNTER_PROMPT_NONE;
+
+        case WEAPON:
+            if (pendingWeaponDiscardCount(player) > 0) return ENCOUNTER_PROMPT_WEAPON_SWAP;
+            return ENCOUNTER_PROMPT_NONE;
+
+        case POTION:
+            if (wouldPotionBeWasted(player)) return ENCOUNTER_PROMPT_POTION_WASTE;
+            return ENCOUNTER_PROMPT_NONE;
+
+        default:
+            return ENCOUNTER_PROMPT_NONE;
+    }
+}
+
+int getSlotCardValue(Game* game, int slotIndex) {
+    if (isRoomSlotEmpty(game, slotIndex)) return 0;
+
+    return game->roomSlots[slotIndex]->data->value;
+}
+
+int previewDamageTaken(Game* game, int slotIndex, CombatChoice combatChoice) {
+    if (isRoomSlotEmpty(game, slotIndex)) return 0;
+
+    Card* chosenCard = game->roomSlots[slotIndex]->data;
+    int rawDamage = decideDamageValue(&game->playerOne, chosenCard, combatChoice);
+
+    return preventNegative(rawDamage);
+}
+
+int pendingWeaponDiscardCount(Player* player) {
+    if (player->weapon.equipped == NULL) return 0;
+
+    return player->weapon.killCount + 1;
+}
+
+bool wouldPotionBeWasted(Player* player) {
+    return player->potionUsedThisTurn;
+}
+
+int clampedDamageToPlayer(int rawHealth, int minHealth, int maxHealth, int rawDamageDealt) {
     rawDamageDealt = preventNegative(rawDamageDealt);
-    int newHp = damageCalculation(rawHp, rawDamageDealt);
-    return clamp(newHp, minHp, maxHp);
+    int newHealth = damageCalculation(rawHealth, rawDamageDealt);
+
+    return clamp(newHealth, minHealth, maxHealth);
 }
 
-int damageCalculation(int currentHP, int damageTaken) {
-    return currentHP - damageTaken;
+int damageCalculation(int currentHealth, int damageTaken) {
+    return currentHealth - damageTaken;
 }
 
-int healCalculation(int currentHp, int healValue) {
-    return currentHp + healValue;
+int healCalculation(int currentHealth, int healValue) {
+    return currentHealth + healValue;
 }
 
-int clampedPlayerHeal(int rawHp, int minHp, int maxHp, int rawHeal) {
+int clampedPlayerHeal(int rawHealth, int minHealth, int maxHealth, int rawHeal) {
     rawHeal = preventNegative(rawHeal);
-    int newHp = healCalculation(rawHp, rawHeal);
-    return clamp(newHp, minHp, maxHp);
+    int newHealth = healCalculation(rawHealth, rawHeal);
+
+    return clamp(newHealth, minHealth, maxHealth);
 }
 
-void setPlayerHealth(struct player* player, int valueToSet) {
-    player->hp = valueToSet;
+void setPlayerHealth(Player* player, int valueToSet) {
+    player->health = valueToSet;
 }
 
-int clamp(int value, int min, int max) {
-    if(value < min) return min;
-    if(value > max) return max;
+int clamp(int value, int minimum, int maximum) {
+    if (value < minimum) return minimum;
+    if (value > maximum) return maximum;
+
     return value;
 }
 
 int preventNegative(int value) {
-    if(value < 0) return 0;
+    if (value < 0) return 0;
+
     return value;
 }
 
-void setCanFleeFalse(struct player* player) {
+void setCanFleeFalse(Player* player) {
     player->canFlee = false;
 }
 
-void setCanFleeTrue(struct player* player) {
+void setCanFleeTrue(Player* player) {
     player->canFlee = true;
 }
 
-int countCardsInRoom(struct game* game) {
-    int count = 0;
-    for (int i = 0; i < MAX_ROOM_SIZE; i++) {
-        if (!isRoomSlotEmpty(game, i)) {
-            count++;
-        }
+void startNewTurn(Player* player) {
+    player->potionUsedThisTurn = false;
+}
+
+int countCardsInRoom(Game* game) {
+    int cardsFound = 0;
+
+    for (int roomSlot = 0; roomSlot < MAX_ROOM_SIZE; roomSlot++) {
+        if (!isRoomSlotEmpty(game, roomSlot)) cardsFound++;
     }
-    return count;
+
+    return cardsFound;
+}
+
+int getEquippedWeaponValue(Player* player) {
+    if (player->weapon.equipped == NULL) return 0;
+
+    return player->weapon.equipped->data->value;
+}
+
+int getLastKillValue(Player* player) {
+    if (player->weapon.killCount == 0) return 0;
+
+    int lastKillIndex = player->weapon.killCount - 1;
+
+    return player->weapon.monsterStack[lastKillIndex]->data->value;
 }

@@ -1,4 +1,6 @@
 #include "Input.h"
+#include "Data_Structure.h"
+#include "UI_manager.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,39 +9,35 @@
 // ========================================================
 // Input processing
 // ========================================================
-int processUserInput() {
+int processUserInput(void) {
     char rawUserInput[21];
 
     if (scanf("%20s", rawUserInput) != 1) {
-        return -1;
+        return INPUT_END_OF_STREAM;
     }
 
-    if (isalpha(rawUserInput[0])) {
-        if (strcmp(rawUserInput, "debug") == 0) {
-            printf("Debug command recognized.\n");
-            return 99;
-        }
-        printf("Unknown command. Please use 0-9 to make a selection.\n");
-        return -1;
-    }
-    
-    if (isdigit(rawUserInput[0])) {
-        int playerChoice = atoi(rawUserInput);
-        return playerChoice;
+    if (strcmp(rawUserInput, "debug") == 0) {
+        return INPUT_DEBUG_COMMAND;
     }
 
-    printf("Unknown command. Please use 0-9 to make a selection.\n");
-    return -1;
+    if (isdigit((unsigned char)rawUserInput[0])) {
+        return atoi(rawUserInput);
+    }
+
+    renderUnknownCommand();
+
+    return INPUT_INVALID;
 }
 
 // ========================================================
 // Utilities
 // ========================================================
-void pressEnterToContinue() {
-    int c;
-    
-    while ((c = getchar()) != '\n' && c != EOF) { } 
-    
+void pressEnterToContinue(void) {
+    int flushedCharacter;
+
+    while ((flushedCharacter = getchar()) != '\n' && flushedCharacter != EOF) { }
+
     printf("\nPress [Enter] to continue...");
-    getchar(); 
+
+    getchar();
 }

@@ -1,144 +1,265 @@
+// ========================================================
+// Scene_manager.c
+// --------------------------------------------------------
+// JOB
+//   A "scene" is one screen the player looks at. Each function
+//   here does the same three steps in the same order:
+//
+//       1. clearScreen()          wipe the terminal
+//       2. render...()            draw it   (UI_manager.c)
+//       3. processUserInput()     read them (Input.c)
+//
+//   That is the entire pattern. Once you see it, every
+//   function in this file reads the same way.
+//
+// TEMPORARY
+//   Throwaway layer, same as UI_manager.c. The engine port
+//   replaces it.
+//
+// WHO CALLS THIS FILE
+//   Game_master.c, and nothing else.
+//
+// WHAT THIS FILE CALLS
+//   UI_manager.h       to draw
+//   Input.h            to read the keyboard
+//   Game_mechanics.h   to ask what is legal, and to apply the
+//                      player's choice once it is made
+//
+// THE ONE RULE
+//   This file decides HOW to ask a question. It never decides
+//   WHAT the rules are. Every rule question goes to
+//   Game_mechanics.c and comes back as a plain answer.
+//
+// MAP OF THIS FILE, IN ORDER
+//   CORE SCENES     the menus and the main play screen
+//   ACTION SCENES   encounters, fleeing, end of turn
+//   DEBUG SCENES    developer tools
+// ========================================================
+
 #include "Scene_manager.h"
 #include "Data_Structure.h"
 #include "Game_mechanics.h"
 #include "UI_manager.h"
 #include "Input.h"
-#include "Game_master.h"
-#include <stdio.h>
 #include <stdbool.h>
 
 // ========================================================
 // CORE SCENES
 // ========================================================
-int openMainMenu() {
+int openMainMenu(void) {
     clearScreen();
-    
-    printf("==============================\n");
-    printf("          SCOUNDREL           \n");
-    printf("==============================\n");
-    printf("1. Start Game\n");
-    printf("2. Options\n");
-    printf("9. Debug Menu\n");
-    printf("==============================\n");
-    printf("Select an option: ");
-    
-    int userInput = processUserInput();
-    return userInput;
+    renderMainMenu();
+
+    return processUserInput();
 }
 
-int runActiveGameScene(struct game* session) {
+int runActiveGameScene(Game* session) {
     clearScreen();
-    debugRender(session);
-    
-    int cardsLeft = countCardsInRoom(session);
-    
-    printf("\n=== ACTIONS ===\n");
-    
-    for (int i = 0; i < MAX_ROOM_SIZE; i++) {
-        if (!isRoomSlotEmpty(session, i)) {
-            printf("%d. Encounter Slot %d\n", i + 1, i + 1);
-        } else {
-            printf("%d. [Empty Slot]\n", i + 1);
-        }
+    renderGameState(session);
+    renderActionMenu(session);
+
+    return processUserInput();
+}
+
+int openPauseScene(void) {
+    clearScreen();
+    renderPauseMenu();
+
+    return processUserInput();
+}
+
+int openOptionsScene(GameMaster* gm) {
+    clearScreen();
+    renderOptionsMenu(gm);
+
+    return processUserInput();
+}
+
+void openGameOverScene(bool playerDied, int finalScore) {
+    clearScreen();
+    renderGameOver(playerDied, finalScore);
+    pressEnterToContinue();
+}
+
+// ========================================================
+// ACTION SCENES
+// ========================================================
+EncounterResult runEncounterScene(Game* session, GameMaster* gm, int chosenSlot) {
+    CombatChoice combatChoice = COMBAT_CHOICE_BARE_HANDED;
+
+    switch (requiredEncounterPrompt(session, chosenSlot)) {
+        case ENCOUNTER_PROMPT_COMBAT_CHOICE:
+            if (gm->autoResolveCombat) {
+                combatChoice = COMBAT_CHOICE_USE_WEAPON;
+                break;
+            }
+            combatChoice = promptCombatChoice(session, chosenSlot);
+            break;
+
+        case ENCOUNTER_PROMPT_WEAPON_SWAP:
+            if (gm->autoConfirmWeaponSwap) break;
+
+            if (!promptWeaponSwapConfirm(pendingWeaponDiscardCount(&session->playerOne))) {
+                return ENCOUNTER_CANCELLED;
+            }
+            break;
+
+        case ENCOUNTER_PROMPT_POTION_WASTE:
+            if (!promptPotionWasteConfirm()) return ENCOUNTER_CANCELLED;
+            break;
+
+        case ENCOUNTER_PROMPT_NONE:
+        default:
+            break;
     }
-    
-    if (session->playerOne.canFlee) {
-        printf("5. Flee the Room\n");
-    } else {
-        printf("5. [Cannot Flee]\n");
+
+    EncounterResult result = encounterManager(session, chosenSlot, combatChoice);
+
+    reportEncounterResult(result);
+
+    return result;
+}
+
+void runTurnCompleteScene(Game* session) {
+    clearScreen();
+    renderGameState(session);
+    renderTurnComplete();
+    pressEnterToContinue();
+}
+
+FleeResult runFleeScene(Game* session) {
+    FleeResult result = fleeManager(session);
+
+    if (result == FLEE_BLOCKED) {
+        renderFleeBlocked();
+        pressEnterToContinue();
     }
-    
-    if (cardsLeft <= 1) {
-        printf("8. Move to Next Room\n");
+
+    return result;
+}
+
+void reportEncounterResult(EncounterResult result) {
+    switch (result) {
+        case ENCOUNTER_BLOCKED_EMPTY_SLOT:
+            renderEmptySlotChosen();
+            pressEnterToContinue();
+            break;
+
+        case ENCOUNTER_BLOCKED_ROOM_NOT_CLEARED:
+            renderRoomNotCleared();
+            pressEnterToContinue();
+            break;
+
+        case ENCOUNTER_RESOLVED:
+        case ENCOUNTER_CANCELLED:
+        default:
+            break;
     }
-    
-    printf("9. Pause Game\n");
-    printf("=================\n");
-    printf("Make your move: ");
-    
-    int userInput = processUserInput();
-    return userInput;
+}
+
+CombatChoice promptCombatChoice(Game* session, int chosenSlot) {
+    while (true) {
+        clearScreen();
+        renderCombatChoicePrompt(session, chosenSlot);
+
+        int playerChoice = processUserInput();
+
+        if (playerChoice == COMBAT_CHOICE_USE_WEAPON) return COMBAT_CHOICE_USE_WEAPON;
+        if (playerChoice == COMBAT_CHOICE_BARE_HANDED) return COMBAT_CHOICE_BARE_HANDED;
+        if (playerChoice == INPUT_END_OF_STREAM) return COMBAT_CHOICE_BARE_HANDED;
+
+        renderInvalidSelection();
+        pressEnterToContinue();
+    }
+}
+
+bool promptWeaponSwapConfirm(int cardsAtRisk) {
+    while (true) {
+        clearScreen();
+        renderWeaponSwapConfirm(cardsAtRisk);
+
+        int playerChoice = processUserInput();
+
+        if (playerChoice == CONFIRM_YES) return true;
+        if (playerChoice == CONFIRM_NO) return false;
+        if (playerChoice == INPUT_END_OF_STREAM) return false;
+
+        renderInvalidSelection();
+        pressEnterToContinue();
+    }
+}
+
+bool promptPotionWasteConfirm(void) {
+    while (true) {
+        clearScreen();
+        renderPotionWasteConfirm();
+
+        int playerChoice = processUserInput();
+
+        if (playerChoice == CONFIRM_YES) return true;
+        if (playerChoice == CONFIRM_NO) return false;
+        if (playerChoice == INPUT_END_OF_STREAM) return false;
+
+        renderInvalidSelection();
+        pressEnterToContinue();
+    }
 }
 
 // ========================================================
 // DEBUG SCENES
 // ========================================================
-void debugGenerateTempTestDeck() {
-    struct game tempSession = {0};
+void debugGenerateTempTestDeck(void) {
+    Game tempSession = {0};
     int totalCards = 0;
-    
+
     generateCardPool(&tempSession, &totalCards);
     buildDeck(&tempSession, totalCards);
-    
+
     printEntireDeckLoop(&tempSession.mainDeck);
     pressEnterToContinue();
 }
 
-void openDebugMenu(struct gameMaster* engine, struct game* activeSession) {
-    if (!engine->debugMenuEnabled) return; 
-    
-    engine->debugOpen = true;
-    
-    while (engine->debugOpen) {
+void openDebugMenu(GameMaster* gm, Game* session) {
+    if (!gm->debugMenuEnabled) return;
+
+    gm->debugOpen = true;
+
+    while (gm->debugOpen) {
         clearScreen();
-        
-        printf("=== DEBUG MENU ===\n");
-        printf("1. Print Main Deck\n");
-        printf("2. Print Discard Pile\n");
-        printf("3. Generate & Print Temp Deck\n");
-        printf("4. Print Player Stats\n");
-        printf("5. Print Dungeon Room\n");
-        printf("9. Close Menu\n");
-        printf("==================\n");
-        printf("Select an option: ");
-        
+        renderDebugMenu();
+
         int playerChoice = processUserInput();
 
         switch (playerChoice) {
-            case 1: 
-                if (isGameSessionActive(activeSession)) {
-                    printSessionDeck(activeSession);
-                } else {
-                    printf("ERROR: No active session running.\n");
-                }
+            case DEBUG_PRINT_MAIN_DECK:
+                printSessionDeck(session);
                 pressEnterToContinue();
                 break;
-                
-            case 2: 
-                if (isGameSessionActive(activeSession)) {
-                    printEntireDeckLoop(&activeSession->discardPile);
-                } else {
-                    printf("ERROR: No active session running.\n");
-                }
+
+            case DEBUG_PRINT_DISCARD_PILE:
+                printDiscardPile(session);
                 pressEnterToContinue();
                 break;
-                
-            case 3: 
+
+            case DEBUG_PRINT_TEMP_DECK:
                 debugGenerateTempTestDeck();
                 break;
-                
-            case 4: 
-                if (isGameSessionActive(activeSession)) {
-                    printCurrentPlayerStats(activeSession);
-                } else {
-                    printf("ERROR: No active session running.\n");
-                }
+
+            case DEBUG_PRINT_PLAYER_STATS:
+                printCurrentPlayerStats(session);
                 pressEnterToContinue();
                 break;
-                
-            case 5: 
-                if (isGameSessionActive(activeSession)) {
-                    printDungeonRoom(activeSession);
-                } else {
-                    printf("ERROR: No active session running.\n");
-                }
+
+            case DEBUG_PRINT_DUNGEON_ROOM:
+                printDungeonRoom(session);
                 pressEnterToContinue();
                 break;
-                
-            case 9: 
-                engine->debugOpen = false;
-                return; 
-                
+
+            case DEBUG_CLOSE_MENU:
+            case INPUT_END_OF_STREAM:
+                gm->debugOpen = false;
+                return;
+
             default:
                 break;
         }

@@ -1,35 +1,35 @@
 #pragma once
 #include <stdbool.h>
 #include "Data_Structure.h"
-#include "Game_master.h"
 
 // ========================================================
 // System entry
 // ========================================================
-int gameMaster();
+int gameMaster(void);
 
 // ========================================================
 // Initialization
 // ========================================================
-void wakeGameMaster(struct gameMaster* startingValues);
-void gameSetUp(struct game* session);
-void setPlayerDefault(struct player* playerOne);
-void randomNumberGenerator(struct gameMaster* engine);
+void wakeGameMaster(GameMaster* gm);
+void gameSetUp(Game* session);
+void randomNumberGenerator(GameMaster* gm);
+
+// ========================================================
+// System routing
+// ========================================================
+void routeMainMenuChoice(GameMaster* gm, int playerChoice);
+void applyOptionsToggle(GameMaster* gm, int playerChoice);
+void optionsLoop(GameMaster* gm);
 
 // ========================================================
 // Game loop managers
 // ========================================================
-void gameLoop(struct gameMaster* gm);
+void gameLoop(GameMaster* gm);
 
 // ========================================================
 // State sub-managers
 // ========================================================
-InGameState activeGameManger(struct game* session, struct gameMaster* gm);
-InGameState activeGamePauseManger(struct game* session, struct gameMaster* gm);
-InGameState activeGameOptionsManger(struct game* session, struct gameMaster* gm);
-InGameState activeGameOverManger(struct game* session, struct gameMaster* gm);
-
-// ========================================================
-// Helpers
-// ========================================================
-bool isGameSessionActive(struct game* session);
+InGameState activeGameManager(Game* session, GameMaster* gm);
+InGameState activeGamePauseManager(Game* session, GameMaster* gm);
+InGameState activeGameOptionsManager(Game* session, GameMaster* gm);
+InGameState activeGameOverManager(Game* session, GameMaster* gm);

@@ -69,12 +69,14 @@ Rather than documenting every function here (that's what code comments are for),
 
 1. `main.c` calls `gameMaster()`, which owns the top-level state machine (main menu, options, in-game).
 2. Starting a game enters `gameLoop()`, which runs its own in-game state machine (active, paused, game over).
-3. Each active turn, `Game_master` asks `Scene_manager` to draw the room and collect a choice. `Scene_manager` prints through `UI_manager` and reads through `Input`. It never touches game rules.
-4. The player's choice comes back as a `PlayerInput` enum value. `Game_master` routes it: an encounter slot goes to `encounterManager()`, and fleeing goes to `fleeManager()`.
-5. Inside `Game_mechanics`, `encounterManager()` looks at the chosen card's type and dispatches to exactly one of `combatManager()`, `healManager()`, or `equipWeapon()`. These change player and card state and nothing else. No printing, no input.
-6. Control returns to `Game_master`, which checks for death, and the loop continues.
+3. Each active turn, `Game_master` first asks `Game_mechanics` whether the room is finished (`isRoomComplete()`). If it is, the only legal action is to press on, so it shows the turn-complete screen and deals the next room itself. No menu, no wasted keypress.
+4. Otherwise `Game_master` asks `Scene_manager` to draw the room and collect a choice. `Scene_manager` prints through `UI_manager` and reads through `Input`. It never touches game rules.
+5. The choice comes back as a `PlayerInput` enum value. `Game_master` routes it: an encounter slot goes to `runEncounterScene()`, fleeing goes to `runFleeScene()`.
+6. Before anything is resolved, `runEncounterScene()` calls `requiredEncounterPrompt()` in `Game_mechanics` to find out whether the player needs asking first: fight with the weapon or bare-handed, confirm discarding an equipped weapon and its kill stack, or confirm burning an already-spent potion.
+7. The answer is handed down as a `CombatChoice` into `encounterManager()`, which looks at the card's type and dispatches to exactly one of `combatManager()`, `healManager()`, or `equipWeapon()`. These change player and card state and nothing else. No printing, no input.
+8. `encounterManager()` returns an `EncounterResult`. If the move was illegal, the scene renders the reason instead of failing silently. Control returns to `Game_master`, which checks for death, and the loop continues.
 
-That one-way flow is the entire program: the master asks the scenes for input, routes it into the mechanics, the mechanics change state, and the master reads the new state.
+That one-way flow is the entire program: the master asks the scenes for input, routes it into the mechanics, the mechanics change state and report back a result code, and the master reads the new state. Because `Game_mechanics` can't print, a refusal has to travel back out as a return code. That's what keeps the rules layer portable.
 
 ## Building and running
 
@@ -88,6 +90,22 @@ gcc -Wall -Wextra -std=c11 *.c -o scoundrel
 ## The rules
 
 Scoundrel is played with a standard 52-card deck with red face cards, red aces, and jokers removed. Clubs and spades are monsters, diamonds are weapons, and hearts are healing potions. You fight through the dungeon four cards at a time, deciding when to fight barehanded, when to spend a weapon's edge, and when to flee. Full rules are in the original PDF linked at the top.
+
+### How the deck is represented
+
+The code has no suits in it. A real deck needs them so you can tell a club from a heart while you sort the pile on your table, but after that they stop mattering and nothing in the game looks at a suit again.
+
+So I generate the 44 cards the game actually uses and label each one the way the rulebook talks about it: monster, weapon, potion. There's no setup step stripping out red face cards and jokers, because those cards never get made. Face cards don't exist either. A jack is a monster worth 11.
+
+That was one of the first design calls I made on my own, and the deck code got shorter for it.
+
+### One rule I had to interpret
+
+The PDF contradicts itself in one place. It says a used weapon can only slay monsters of "a lower value (less than equal)" than the last one it killed. Those two readings disagree, and the worked examples underneath (a 6 against a 12, a 12 against a 6) never land on the case where the values match.
+
+I went with the parenthetical, so a weapon that killed an 8 can still take another 8. Most write-ups of the rules I found read it the same way.
+
+The bigger reason is that it plays better. The strict reading burns weapons down faster, and you get more turns where nothing you're carrying helps and you just take the hit. Allowing equal values keeps a weapon useful longer and cuts down on games that were already lost a few turns before the player could tell. Flipping it back is one operator in `checkWeaponState`.
 
 ## What's next
 
