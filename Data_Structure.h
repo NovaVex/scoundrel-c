@@ -1,6 +1,7 @@
 #pragma once
 #include <stdbool.h>
 
+#define GAME_VERSION "0.1.0"
 #define DECK_SIZE 52
 #define MAX_ROOM_SIZE 4
 #define MAX_MONSTER_WEAPON_STACK 26

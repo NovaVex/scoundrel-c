@@ -136,6 +136,7 @@ void renderPrompt(const char* label) {
 // ------------------------------------------------
 //  ==============================
 //            SCOUNDREL
+//              v0.1.0
 //  ==============================
 //  1. Start Game
 //  2. Options
@@ -150,6 +151,7 @@ void renderPrompt(const char* label) {
 void renderMainMenu(GameMaster* gm) {
     renderRule();
     printf("          SCOUNDREL           \n");
+    printf("            v%s\n", GAME_VERSION);
     renderRule();
 
     renderMenuOption(MENU_START_GAME, "Start Game");
