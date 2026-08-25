@@ -514,14 +514,25 @@ void renderBareHandedConfirm(Game* session, int chosenSlot) {
     renderPrompt("Choose");
 }
 
-// Only shown when a weapon is already equipped, and only
-// when Auto-Confirm Weapon Swap is OFF:
+// Drawn in the action menu's place, under renderGameState, so
+// the weapon being given up and its kill count stay on screen
+// while the player decides. Only shown when a weapon is already
+// equipped, and only when Auto-Confirm Weapon Swap is OFF:
 // ------------------------------------------------
+//  Weapon Value: 7 | Last Kill: 9   <- renderGameState
+//  ...
+//  Slot 1: [8 of W]
+//  Slot 2: [11 of M]
+//  ==============================
+//
 //  Equipping this weapon will discard your current
 //  weapon and its kill stack (1 card(s)).
 //  1. Yes, equip it
 //  2. No, leave it
 //  Choose: _
+// ------------------------------------------------
+//  The count comes from pendingWeaponDiscardCount, so it
+//  always matches what discardEquippedWeapon will throw away.
 // ------------------------------------------------
 void renderWeaponSwapConfirm(int cardsAtRisk) {
     printf("\nEquipping this weapon will discard your current weapon and its kill stack (%d card(s)).\n", cardsAtRisk);
@@ -532,9 +543,19 @@ void renderWeaponSwapConfirm(int cardsAtRisk) {
     renderPrompt("Choose");
 }
 
-// Only shown for a second potion in the same turn. No
-// toggle skips this one; wasting a potion always asks:
+// Drawn in the action menu's place, under renderGameState, so
+// the "Potion Used This Turn? YES" line that causes this warning
+// is visible right above it. Only shown for a second potion in
+// the same turn. No toggle skips this one; wasting a potion
+// always asks:
 // ------------------------------------------------
+//  HP: 14/20                        <- renderGameState
+//  ...
+//  Potion Used This Turn? YES
+//  ------------------------------
+//  Slot 1: [5 of P]
+//  ==============================
+//
 //  You already drank a potion this turn. This one
 //  will be wasted with no healing effect.
 //  1. Drink it anyway

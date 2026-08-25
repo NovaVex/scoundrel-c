@@ -26,5 +26,5 @@ FleeResult runFleeScene(Game* session);
 void reportEncounterResult(EncounterResult result);
 CombatChoice promptCombatChoice(Game* session, int chosenSlot);
 bool promptBareHandedConfirm(Game* session, int chosenSlot);
-bool promptWeaponSwapConfirm(int cardsAtRisk);
-bool promptPotionWasteConfirm(void);
+bool promptWeaponSwapConfirm(Game* session);
+bool promptPotionWasteConfirm(Game* session);

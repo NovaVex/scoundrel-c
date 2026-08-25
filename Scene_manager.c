@@ -107,13 +107,13 @@ EncounterResult runEncounterScene(Game* session, GameMaster* gm, int chosenSlot)
         case ENCOUNTER_PROMPT_WEAPON_SWAP:
             if (gm->autoConfirmWeaponSwap) break;
 
-            if (!promptWeaponSwapConfirm(pendingWeaponDiscardCount(&session->playerOne))) {
+            if (!promptWeaponSwapConfirm(session)) {
                 return ENCOUNTER_CANCELLED;
             }
             break;
 
         case ENCOUNTER_PROMPT_POTION_WASTE:
-            if (!promptPotionWasteConfirm()) return ENCOUNTER_CANCELLED;
+            if (!promptPotionWasteConfirm(session)) return ENCOUNTER_CANCELLED;
             break;
 
         case ENCOUNTER_PROMPT_NONE:
@@ -199,10 +199,11 @@ bool promptBareHandedConfirm(Game* session, int chosenSlot) {
     }
 }
 
-bool promptWeaponSwapConfirm(int cardsAtRisk) {
+bool promptWeaponSwapConfirm(Game* session) {
     while (true) {
         clearScreen();
-        renderWeaponSwapConfirm(cardsAtRisk);
+        renderGameState(session);
+        renderWeaponSwapConfirm(pendingWeaponDiscardCount(&session->playerOne));
 
         int playerChoice = processUserInput();
 
@@ -215,9 +216,10 @@ bool promptWeaponSwapConfirm(int cardsAtRisk) {
     }
 }
 
-bool promptPotionWasteConfirm(void) {
+bool promptPotionWasteConfirm(Game* session) {
     while (true) {
         clearScreen();
+        renderGameState(session);
         renderPotionWasteConfirm();
 
         int playerChoice = processUserInput();
