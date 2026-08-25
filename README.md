@@ -1,12 +1,54 @@
 # Scoundrel (in C)
 
-A terminal implementation of [Scoundrel](http://www.stfj.net/art/2011/Scoundrel.pdf), the single-player roguelike card game by Zach Gage and Kurt Bieg. Written in C with zero dependencies.
+A terminal implementation of [Scoundrel](http://www.stfj.net/art/2011/Scoundrel.pdf), the single-player card game by Zach Gage and Kurt Bieg. Written in C with zero dependencies.
 
 This is my first programming project. The game itself was almost beside the point. What I wanted was to take a simple, well-defined set of rules and deliberately over-engineer them into complete, modular, dependency-free code, so every concept I was learning had somewhere real to live.
 
 **Current status: Alpha.** The game is fully playable, but it's a foundation. It's a working core I built so I'd have something real to practice computer science on, and most of the interesting features are still ahead of it.
 
 *(This README is a first draft. It will grow alongside the project.)*
+
+## Download and play
+
+Download one file and run it. No installer, nothing to set up.
+
+| Platform | File |
+|---|---|
+| Windows (64-bit) | `scoundrel-v0.1.0-windows-x86_64.exe` |
+| Linux (64-bit) | `scoundrel-v0.1.0-linux-x86_64` |
+
+Both are on the [latest release page](https://github.com/NovaVex/scoundrel-c/releases/latest).
+
+### Windows
+
+Download the `.exe` and double-click it.
+
+The first time you run it, Windows will show a **"Windows protected your PC"** box. That's SmartScreen, and it flags any program that hasn't been code-signed. Signing requires a certificate, which isn't in my budget right now. I intend to get one once I can afford it. Until then, click **More info**, then **Run anyway**.
+
+If you'd rather not run an unsigned binary, the source is right here and it builds in one command. See [Building and running](#building-and-running).
+
+### Linux
+
+Download the file, make it executable, then run it:
+
+```bash
+chmod +x scoundrel-v0.1.0-linux-x86_64
+./scoundrel-v0.1.0-linux-x86_64
+```
+
+It's statically linked, so it doesn't care what distro you're on or what version of glibc you have.
+
+### Reading the screen
+
+The whole game is numbers on the keyboard. Type a number, press Enter.
+
+Each room deals four cards, labelled by what they do rather than by suit:
+
+- **M** is a monster. Fighting it costs you health equal to its value, less your weapon's value if your weapon can still be used on it.
+- **W** is a weapon. Equipping one discards whatever you were already carrying.
+- **P** is a potion. It heals you, but only the first one each turn.
+
+The number beside the letter is the card's value. Everything else is in [The rules](#the-rules) below.
 
 ## Why C
 
@@ -80,11 +122,17 @@ That one-way flow is the entire program: the master asks the scenes for input, r
 
 ## Building and running
 
-Requires only gcc (or any C11 compiler). No libraries, no build system, nothing to install.
+Requires only gcc (or any C11 compiler). No libraries, nothing to install.
+
+```
+make
+./scoundrel
+```
+
+There's a Makefile now, but it's only ever a convenience. The compiler line it runs is still the whole build:
 
 ```
 gcc -Wall -Wextra -std=c11 *.c -o scoundrel
-./scoundrel
 ```
 
 ## The rules
