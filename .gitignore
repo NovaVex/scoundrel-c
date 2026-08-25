@@ -12,4 +12,7 @@ scoundrel-v*
 # then the text moves into the real file and the draft is deleted.
 DRAFT_*.md
 
+# Local editor settings
+.vscode/
+
 .claude/settings.local.json
