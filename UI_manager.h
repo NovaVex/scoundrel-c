@@ -50,6 +50,7 @@ void renderInvalidSelection(void);
 // Action prompts
 // ========================================================
 void renderCombatChoicePrompt(Game* session, int chosenSlot);
+void renderBareHandedConfirm(Game* session, int chosenSlot);
 void renderWeaponSwapConfirm(int cardsAtRisk);
 void renderPotionWasteConfirm(void);
 

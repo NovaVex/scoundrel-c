@@ -426,7 +426,7 @@ EncounterPrompt requiredEncounterPrompt(Game* game, int slotIndex) {
     switch (chosenCard->type) {
         case MONSTER:
             if (weaponUsableOnMonster(player, chosenCard)) return ENCOUNTER_PROMPT_COMBAT_CHOICE;
-            return ENCOUNTER_PROMPT_NONE;
+            return ENCOUNTER_PROMPT_BARE_HANDED_CONFIRM;
 
         case WEAPON:
             if (pendingWeaponDiscardCount(player) > 0) return ENCOUNTER_PROMPT_WEAPON_SWAP;

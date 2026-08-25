@@ -96,6 +96,14 @@ EncounterResult runEncounterScene(Game* session, GameMaster* gm, int chosenSlot)
             combatChoice = promptCombatChoice(session, chosenSlot);
             break;
 
+        case ENCOUNTER_PROMPT_BARE_HANDED_CONFIRM:
+            if (gm->autoResolveCombat) break;
+
+            if (!promptBareHandedConfirm(session, chosenSlot)) {
+                return ENCOUNTER_CANCELLED;
+            }
+            break;
+
         case ENCOUNTER_PROMPT_WEAPON_SWAP:
             if (gm->autoConfirmWeaponSwap) break;
 
@@ -167,6 +175,23 @@ CombatChoice promptCombatChoice(Game* session, int chosenSlot) {
         if (playerChoice == COMBAT_CHOICE_USE_WEAPON) return COMBAT_CHOICE_USE_WEAPON;
         if (playerChoice == COMBAT_CHOICE_BARE_HANDED) return COMBAT_CHOICE_BARE_HANDED;
         if (playerChoice == INPUT_END_OF_STREAM) return COMBAT_CHOICE_BARE_HANDED;
+
+        renderInvalidSelection();
+        pressEnterToContinue();
+    }
+}
+
+bool promptBareHandedConfirm(Game* session, int chosenSlot) {
+    while (true) {
+        clearScreen();
+        renderGameState(session);
+        renderBareHandedConfirm(session, chosenSlot);
+
+        int playerChoice = processUserInput();
+
+        if (playerChoice == CONFIRM_YES) return true;
+        if (playerChoice == CONFIRM_NO) return false;
+        if (playerChoice == INPUT_END_OF_STREAM) return false;
 
         renderInvalidSelection();
         pressEnterToContinue();

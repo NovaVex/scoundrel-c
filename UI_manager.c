@@ -432,6 +432,53 @@ void renderCombatChoicePrompt(Game* session, int chosenSlot) {
     renderPrompt("Choose");
 }
 
+// Drawn in the action menu's place, under renderGameState, so
+// the player keeps their stats and the room in front of them
+// while they decide. Shown when the weapon cannot be used on
+// this monster and the hit will land in full, and only when
+// Auto-Resolve Combat is OFF:
+// ------------------------------------------------
+//  Slot 1: [8 of W]                 <- renderGameState
+//  Slot 2: [11 of M]
+//  Slot 3: [3 of M]
+//  Slot 4: [EMPTY]
+//  ==============================
+//
+//  === A 11 of M blocks your path ===
+//  You have no weapon. You will fight bare-handed.
+//  Damage taken: 11
+//  1. Yes, fight it
+//  2. No, pick something else
+//  Choose: _
+// ------------------------------------------------
+//  The "no weapon" line has two shapes, the same split
+//  renderWeaponLine makes. With a worn weapon equipped:
+//  Your weapon is too worn for this one (last kill: 4).
+//  You will fight bare-handed.
+// ------------------------------------------------
+//  The damage number comes from previewDamageTaken in
+//  Game_mechanics.c, the same function combat itself uses.
+// ------------------------------------------------
+void renderBareHandedConfirm(Game* session, int chosenSlot) {
+    Player* player = &session->playerOne;
+
+    printf("\n=== A %d of %c blocks your path ===\n", getSlotCardValue(session, chosenSlot), MONSTER);
+
+    if (player->weapon.equipped == NULL) {
+        printf("You have no weapon. You will fight bare-handed.\n");
+    } else {
+        printf("Your weapon is too worn for this one (last kill: %d).\n", getLastKillValue(player));
+        printf("You will fight bare-handed.\n");
+    }
+
+    printf("Damage taken: %d\n", previewDamageTaken(session, chosenSlot, COMBAT_CHOICE_BARE_HANDED));
+
+    renderMenuOption(CONFIRM_YES, "Yes, fight it");
+    renderMenuOption(CONFIRM_NO, "No, pick something else");
+
+    renderPrompt("Choose");
+}
+
 // Only shown when a weapon is already equipped, and only
 // when Auto-Confirm Weapon Swap is OFF:
 // ------------------------------------------------
