@@ -432,9 +432,17 @@ void renderInvalidSelection(void) {
 // ========================================================
 // Action prompts
 // ========================================================
-// Only shown when the weapon is actually usable on this
-// monster, and only when Auto-Resolve Combat is OFF:
+// Drawn in the action menu's place, under renderGameState, so
+// the player keeps their stats and the room in front of them
+// while they decide. Shown when the weapon is actually usable
+// on this monster, and only when Auto-Resolve Combat is OFF:
 // ------------------------------------------------
+//  Slot 1: [8 of W]                 <- renderGameState
+//  Slot 2: [11 of M]
+//  Slot 3: [3 of M]
+//  Slot 4: [EMPTY]
+//  ==============================
+//
 //  === A 11 of M blocks your path ===
 //  1. Fight with your weapon (Value: 7 | Damage taken: 4)
 //  2. Fight bare-handed (Damage taken: 11)

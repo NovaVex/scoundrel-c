@@ -168,6 +168,7 @@ void reportEncounterResult(EncounterResult result) {
 CombatChoice promptCombatChoice(Game* session, int chosenSlot) {
     while (true) {
         clearScreen();
+        renderGameState(session);
         renderCombatChoicePrompt(session, chosenSlot);
 
         int playerChoice = processUserInput();
