@@ -21,9 +21,10 @@ void renderPrompt(const char* label);
 // ========================================================
 // Menu rendering
 // ========================================================
-void renderMainMenu(void);
-void renderPauseMenu(void);
+void renderMainMenu(GameMaster* gm);
+void renderPauseMenu(GameMaster* gm);
 void renderOptionsMenu(GameMaster* gm);
+void renderDebugLine(GameMaster* gm, int optionKey);
 void renderDebugMenu(void);
 void renderTurnComplete(void);
 void renderGameOver(bool playerDied, int finalScore);

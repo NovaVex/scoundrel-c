@@ -5,9 +5,9 @@
 // ========================================================
 // CORE SCENES
 // ========================================================
-int openMainMenu(void);
+int openMainMenu(GameMaster* gm);
 int runActiveGameScene(Game* session);
-int openPauseScene(void);
+int openPauseScene(GameMaster* gm);
 int openOptionsScene(GameMaster* gm);
 void openGameOverScene(bool playerDied, int finalScore);
 

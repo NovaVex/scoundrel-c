@@ -139,40 +139,58 @@ void renderPrompt(const char* label) {
 //  ==============================
 //  1. Start Game
 //  2. Options
-//  9. Debug Menu
 //  0. Quit
 //  ==============================
 //  Select an option: _
 // ------------------------------------------------
-void renderMainMenu(void) {
+//  "9. Debug Menu" is missing on purpose. It only
+//  appears once the player types the word "debug"
+//  at this menu. See renderDebugLine.
+// ------------------------------------------------
+void renderMainMenu(GameMaster* gm) {
     renderRule();
     printf("          SCOUNDREL           \n");
     renderRule();
 
     renderMenuOption(MENU_START_GAME, "Start Game");
     renderMenuOption(MENU_OPTIONS, "Options");
-    renderMenuOption(MENU_DEBUG, "Debug Menu");
+    renderDebugLine(gm, MENU_DEBUG);
     renderMenuOption(MENU_QUIT, "Quit");
 
     renderRule();
     renderPrompt("Select an option");
 }
 
+// The easter egg, in one place. Every menu that can open the
+// debug tools draws its entry through this, so the option is
+// invisible until gm->debugMenuEnabled is set, and all three
+// menus reveal and hide their entry together.
+//
+// The word is armed in routeMainMenuChoice (Game_master.c),
+// which is what Input.c's INPUT_DEBUG_COMMAND lands on.
+void renderDebugLine(GameMaster* gm, int optionKey) {
+    if (!gm->debugMenuEnabled) return;
+
+    renderMenuOption(optionKey, "Debug Menu");
+}
+
 // ------------------------------------------------
 //  === PAUSED ===
 //  1. Resume Game
 //  2. Options
-//  3. Debug Menu
 //  9. Quit to Main Menu
 //  ==============================
 //  Select an option: _
 // ------------------------------------------------
-void renderPauseMenu(void) {
+//  "3. Debug Menu" appears here only while the
+//  easter egg is armed. See renderDebugLine.
+// ------------------------------------------------
+void renderPauseMenu(GameMaster* gm) {
     renderTitle("PAUSED");
 
     renderMenuOption(PAUSE_RESUME, "Resume Game");
     renderMenuOption(PAUSE_OPTIONS, "Options");
-    renderMenuOption(PAUSE_DEBUG, "Debug Menu");
+    renderDebugLine(gm, PAUSE_DEBUG);
     renderMenuOption(PAUSE_QUIT, "Quit to Main Menu");
 
     renderRule();
@@ -181,20 +199,27 @@ void renderPauseMenu(void) {
 
 // ------------------------------------------------
 //  === OPTIONS ===
-//  1. Debug Menu (Current: OFF)
 //  2. Auto-Resolve Combat (Current: OFF)
 //  3. Auto-Confirm Weapon Swap (Current: OFF)
 //  9. Back
 //  ==============================
 //  Select an option: _
 //
-//  The three ON/OFF values are read live from gm,
-//  so this screen redraws with whatever is set.
+//  The ON/OFF values are read live from gm, so this
+//  screen redraws with whatever is set.
+//
+//  Once the easter egg is armed, line 1 appears
+//  above the rest and is the way to switch it back
+//  off again:
+//  1. Debug Menu (Current: ON)
 // ------------------------------------------------
 void renderOptionsMenu(GameMaster* gm) {
     renderTitle("OPTIONS");
 
-    renderToggleOption(OPTIONS_TOGGLE_DEBUG, "Debug Menu", gm->debugMenuEnabled);
+    if (gm->debugMenuEnabled) {
+        renderToggleOption(OPTIONS_TOGGLE_DEBUG, "Debug Menu", gm->debugMenuEnabled);
+    }
+
     renderToggleOption(OPTIONS_TOGGLE_AUTO_COMBAT, "Auto-Resolve Combat", gm->autoResolveCombat);
     renderToggleOption(OPTIONS_TOGGLE_AUTO_EQUIP, "Auto-Confirm Weapon Swap", gm->autoConfirmWeaponSwap);
     renderMenuOption(OPTIONS_BACK, "Back");

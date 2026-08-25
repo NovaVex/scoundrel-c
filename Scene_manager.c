@@ -46,9 +46,9 @@
 // ========================================================
 // CORE SCENES
 // ========================================================
-int openMainMenu(void) {
+int openMainMenu(GameMaster* gm) {
     clearScreen();
-    renderMainMenu();
+    renderMainMenu(gm);
 
     return processUserInput();
 }
@@ -61,9 +61,9 @@ int runActiveGameScene(Game* session) {
     return processUserInput();
 }
 
-int openPauseScene(void) {
+int openPauseScene(GameMaster* gm) {
     clearScreen();
-    renderPauseMenu();
+    renderPauseMenu(gm);
 
     return processUserInput();
 }

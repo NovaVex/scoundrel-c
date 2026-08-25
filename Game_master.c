@@ -55,7 +55,7 @@ int gameMaster(void) {
     while (gm.gameState != SYSTEM_EXIT) {
         switch (gm.gameState) {
             case SYSTEM_MAIN_MENU:
-                routeMainMenuChoice(&gm, openMainMenu());
+                routeMainMenuChoice(&gm, openMainMenu(&gm));
                 break;
 
             case SYSTEM_IN_GAME:
@@ -148,8 +148,15 @@ void routeMainMenuChoice(GameMaster* gm, int playerChoice) {
 
 void applyOptionsToggle(GameMaster* gm, int playerChoice) {
     switch (playerChoice) {
+        // One-way switch by design. The options screen only draws this
+        // line while the egg is already armed, so its job is to put the
+        // tools away again. Typing "debug" at the main menu stays the
+        // only way to arm them, and pressing 1 on a hidden line does
+        // nothing rather than quietly handing them over.
         case OPTIONS_TOGGLE_DEBUG:
-            gm->debugMenuEnabled = !gm->debugMenuEnabled;
+            if (!gm->debugMenuEnabled) break;
+
+            gm->debugMenuEnabled = false;
             break;
 
         case OPTIONS_TOGGLE_AUTO_COMBAT:
@@ -255,7 +262,7 @@ InGameState activeGameManager(Game* session, GameMaster* gm) {
 }
 
 InGameState activeGamePauseManager(Game* session, GameMaster* gm) {
-    int playerChoice = openPauseScene();
+    int playerChoice = openPauseScene(gm);
 
     switch (playerChoice) {
         case PAUSE_RESUME:
