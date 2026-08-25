@@ -1,5 +1,15 @@
+# Local build output
 scoundrel
 scoundrel.exe
 *.o
+
+# Release binaries. These are attached to the GitHub Release page
+# instead. Committing one puts it in every clone forever, even
+# after it is deleted.
+scoundrel-v*
+
+# Work in progress. Drafts live here until the wording is settled,
+# then the text moves into the real file and the draft is deleted.
+DRAFT_*.md
 
 .claude/settings.local.json
