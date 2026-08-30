@@ -12,6 +12,11 @@ scoundrel-v*
 # then the text moves into the real file and the draft is deleted.
 DRAFT_*.md
 
+# Working plan for the in-progress reorganization. Notes to myself
+# about work not done yet, not a record of the project. Deleted once
+# the steps are finished.
+REFACTOR_PLAN.md
+
 # Local editor settings
 .vscode/
 
