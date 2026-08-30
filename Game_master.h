@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include "Game_mechanics.h"
 
-#define GAME_VERSION "0.1.0"
+#define GAME_VERSION "0.1.1"
 
 // ========================================================
 // State machines
