@@ -1,6 +1,36 @@
 #pragma once
 #include <stdbool.h>
-#include "Data_Structure.h"
+#include "Game_mechanics.h"
+
+#define GAME_VERSION "0.1.0"
+
+// ========================================================
+// State machines
+// ========================================================
+typedef enum SystemState {
+    SYSTEM_EXIT = 0,
+    SYSTEM_MAIN_MENU = 1,
+    SYSTEM_IN_GAME = 2,
+    SYSTEM_OPTIONS = 3
+} SystemState;
+
+typedef enum InGameState {
+    PLAYING_ACTIVE,
+    PLAYING_PAUSED,
+    PLAYING_OPTIONS,
+    PLAYING_GAMEOVER,
+    PLAYING_EXIT
+} InGameState;
+
+typedef struct GameMaster {
+    bool debugMenuEnabled;
+    bool debugOpen;
+    bool autoResolveCombat;
+    bool autoConfirmWeaponSwap;
+    SystemState gameState;
+    unsigned int rngSeed;
+} GameMaster;
+
 
 // ========================================================
 // System entry

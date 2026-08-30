@@ -1,5 +1,5 @@
 #include "Input.h"
-#include "Data_Structure.h"
+#include "Terminal_Input.h"
 #include "UI_manager.h"
 #include <stdio.h>
 #include <stdlib.h>

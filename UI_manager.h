@@ -1,6 +1,7 @@
 #pragma once
 #include <stdbool.h>
-#include "Data_Structure.h"
+#include "Game_mechanics.h"
+#include "Game_master.h"
 
 // ========================================================
 // Basic utilities

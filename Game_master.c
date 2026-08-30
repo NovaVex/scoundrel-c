@@ -37,7 +37,7 @@
 // ========================================================
 
 #include "Game_master.h"
-#include "Data_Structure.h"
+#include "Terminal_Input.h"
 #include "Scene_manager.h"
 #include "Game_mechanics.h"
 #include "UI_manager.h"

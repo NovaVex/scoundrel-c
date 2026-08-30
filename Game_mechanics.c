@@ -30,8 +30,16 @@
 // ========================================================
 
 #include "Game_mechanics.h"
-#include "Data_Structure.h"
 #include <stdlib.h>
+
+typedef enum WeaponState {
+    WEAPON_NONE,
+    WEAPON_FRESH,
+    WEAPON_VALID_COMBO,
+    WEAPON_INVALID_COMBO
+} WeaponState;
+
+static WeaponState checkWeaponState(Player* player, Card* monster);
 
 // ========================================================
 // Card Manipulation
@@ -387,7 +395,7 @@ int decideDamageValue(Player* player, Card* monster, CombatChoice combatChoice) 
     }
 }
 
-WeaponState checkWeaponState(Player* player, Card* monster) {
+static WeaponState checkWeaponState(Player* player, Card* monster) {
     if (player->weapon.equipped == NULL) return WEAPON_NONE;
     if (player->weapon.killCount == 0) return WEAPON_FRESH;
 

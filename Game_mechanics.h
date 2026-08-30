@@ -1,6 +1,98 @@
 #pragma once
 #include <stdbool.h>
-#include "Data_Structure.h"
+
+#define DECK_SIZE 52
+#define MAX_ROOM_SIZE 4
+#define MAX_MONSTER_WEAPON_STACK 26
+#define STARTING_HEALTH 20
+#define MINIMUM_HEALTH 0
+
+// ========================================================
+// Cards and piles
+// ========================================================
+typedef enum EncounterType {
+    EMPTY = 'E',
+    MONSTER = 'M',
+    POTION = 'P',
+    WEAPON = 'W',
+    FLEE = 'F'
+} EncounterType;
+
+typedef struct Card {
+    int id;
+    char type;
+    int value;
+} Card;
+
+typedef struct CardLink {
+    Card* data;
+    struct CardLink* next;
+} CardLink;
+
+typedef struct Zone {
+    CardLink* topCard;
+    CardLink* bottomCard;
+    int count;
+} Zone;
+
+// ========================================================
+// The player
+// ========================================================
+typedef struct Weapon {
+    CardLink* equipped;
+    CardLink* monsterStack[MAX_MONSTER_WEAPON_STACK];
+    int killCount;
+} Weapon;
+
+typedef struct Player {
+    int minHealth;
+    int maxHealth;
+    int health;
+    Weapon weapon;
+    bool canFlee;
+    bool potionUsedThisTurn;
+} Player;
+
+// ========================================================
+// The session
+// ========================================================
+typedef struct Game {
+    Card globalCardPool[DECK_SIZE];
+    CardLink nodePool[DECK_SIZE];
+    Zone mainDeck;
+    Zone discardPile;
+    CardLink* roomSlots[MAX_ROOM_SIZE];
+    Player playerOne;
+    Card* lastResolvedCard;
+} Game;
+
+// ========================================================
+// Answers the rules hand back
+// ========================================================
+typedef enum CombatChoice {
+    COMBAT_CHOICE_USE_WEAPON = 1,
+    COMBAT_CHOICE_BARE_HANDED = 2
+} CombatChoice;
+
+typedef enum EncounterResult {
+    ENCOUNTER_RESOLVED,
+    ENCOUNTER_CANCELLED,
+    ENCOUNTER_BLOCKED_EMPTY_SLOT,
+    ENCOUNTER_BLOCKED_ROOM_NOT_CLEARED
+} EncounterResult;
+
+typedef enum EncounterPrompt {
+    ENCOUNTER_PROMPT_NONE,
+    ENCOUNTER_PROMPT_COMBAT_CHOICE,
+    ENCOUNTER_PROMPT_BARE_HANDED_CONFIRM,
+    ENCOUNTER_PROMPT_WEAPON_SWAP,
+    ENCOUNTER_PROMPT_POTION_WASTE
+} EncounterPrompt;
+
+typedef enum FleeResult {
+    FLEE_RESOLVED,
+    FLEE_BLOCKED
+} FleeResult;
 
 // ========================================================
 // Card Manipulation
@@ -46,7 +138,6 @@ bool canEncounterCards(Game* game);
 bool isRoomComplete(Game* game);
 bool isGameSessionActive(Game* game);
 int decideDamageValue(Player* player, Card* monster, CombatChoice combatChoice);
-WeaponState checkWeaponState(Player* player, Card* monster);
 bool weaponUsableOnMonster(Player* player, Card* monster);
 bool willUseWeapon(Player* player, Card* monster, CombatChoice combatChoice);
 EncounterPrompt requiredEncounterPrompt(Game* game, int slotIndex);
