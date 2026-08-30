@@ -41,7 +41,6 @@ void renderActionMenu(Game* session);
 // ========================================================
 // Messages
 // ========================================================
-void renderUnknownCommand(void);
 void renderNoActiveSession(void);
 void renderEmptySlotChosen(void);
 void renderRoomNotCleared(void);

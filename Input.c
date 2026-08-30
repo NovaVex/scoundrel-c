@@ -1,6 +1,5 @@
 #include "Input.h"
 #include "Terminal_Input.h"
-#include "UI_manager.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,8 +22,6 @@ int processUserInput(void) {
     if (isdigit((unsigned char)rawUserInput[0])) {
         return atoi(rawUserInput);
     }
-
-    renderUnknownCommand();
 
     return INPUT_INVALID;
 }

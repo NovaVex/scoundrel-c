@@ -405,10 +405,6 @@ void renderActionMenu(Game* session) {
 // ========================================================
 // Messages
 // ========================================================
-void renderUnknownCommand(void) {
-    printf("Unknown command. Please use 0-9 to make a selection.\n");
-}
-
 void renderNoActiveSession(void) {
     printf("ERROR: No active session running.\n");
 }
