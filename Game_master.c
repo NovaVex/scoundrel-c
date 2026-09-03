@@ -40,7 +40,6 @@
 #include "Terminal_Input.h"
 #include "Scene_manager.h"
 #include "Game_mechanics.h"
-#include "UI_manager.h"
 #include <stdlib.h>
 #include <time.h>
 

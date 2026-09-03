@@ -13,7 +13,7 @@
 
 CC      = gcc
 CFLAGS  = -Wall -Wextra -std=c11
-SOURCES = main.c Game_master.c Game_mechanics.c Scene_manager.c UI_manager.c Input.c
+SOURCES = main.c Game_master.c Game_mechanics.c Scene_manager.c Input.c
 
 # Windows needs the .exe suffix; Linux does not.
 ifeq ($(OS),Windows_NT)
