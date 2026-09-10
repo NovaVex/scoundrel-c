@@ -353,14 +353,14 @@ void renderWeaponLine(Player* player) {
 
 void renderRoomSlots(Game* session) {
     for (int roomSlot = 0; roomSlot < MAX_ROOM_SIZE; roomSlot++) {
-        CardLink* slotLink = session->roomSlots[roomSlot];
+        Card* slotCard = session->roomSlots[roomSlot];
 
-        if (slotLink == NULL) {
+        if (slotCard == NULL) {
             printf("Slot %d: [EMPTY]\n", roomSlot + 1);
             continue;
         }
 
-        printf("Slot %d: [%d of %c]\n", roomSlot + 1, slotLink->data->value, slotLink->data->type);
+        printf("Slot %d: [%d of %c]\n", roomSlot + 1, slotCard->value, slotCard->type);
     }
 }
 
@@ -826,9 +826,9 @@ void openDebugMenu(GameMaster* gm, Game* session) {
 
 void debugGenerateTempTestDeck(void) {
     Game tempSession = {0};
-    int totalCards = 0;
 
-    generateCardPool(&tempSession, &totalCards);
+    int totalCards = generateGlobalCardPool(tempSession.globalCardPool);
+
     buildDeck(&tempSession, totalCards);
 
     printEntireDeckLoop(&tempSession.mainDeck);
@@ -853,26 +853,20 @@ void printCurrentPlayerStats(Game* session) {
 }
 
 void printEntireDeckLoop(Zone* pile) {
-    CardLink* currentLink = pile->topCard;
-    int position = 1;
-
-    if (currentLink == NULL) {
+    if (pile->count == 0) {
         printf("--- PILE IS EMPTY ---\n");
         renderSeparator();
         return;
     }
 
-    while (currentLink != NULL) {
-        Card* cardData = currentLink->data;
+    for (int position = 0; position < pile->count; position++) {
+        Card* cardData = cardAtPosition(pile, position);
 
         printf("Position: %d | Card ID: %d | Type: %c | Value: %d\n",
-            position,
+            position + 1,
             cardData->id,
             cardData->type,
             cardData->value);
-
-        currentLink = currentLink->next;
-        position++;
     }
 
     printf("--- END OF PILE ---\n");
@@ -906,18 +900,18 @@ void printDungeonRoom(Game* session) {
     }
 
     for (int roomSlot = 0; roomSlot < MAX_ROOM_SIZE; roomSlot++) {
-        CardLink* slotLink = session->roomSlots[roomSlot];
+        Card* slotCard = session->roomSlots[roomSlot];
 
-        if (slotLink == NULL) {
+        if (slotCard == NULL) {
             printf("Dungeon Slot %d | [EMPTY]\n", roomSlot + 1);
             continue;
         }
 
         printf("Dungeon Slot %d | Card ID: %d | Type: %c | Value: %d\n",
             roomSlot + 1,
-            slotLink->data->id,
-            slotLink->data->type,
-            slotLink->data->value);
+            slotCard->id,
+            slotCard->type,
+            slotCard->value);
     }
 
     printf("--- END OF ROOM ---\n");

@@ -2,6 +2,11 @@
 #include <stdbool.h>
 
 #define DECK_SIZE 52
+#define MIN_CARD_VALUE 2
+#define MAX_MONSTER_ATTACK_VALUE 15
+#define STARTING_MONSTER_QUANTITY 26
+#define STARTING_POTIONS_QUANTITY 9
+#define STARTING_WEAPONS_QUANTITY 9
 #define MAX_ROOM_SIZE 4
 #define MAX_MONSTER_WEAPON_STACK 26
 #define STARTING_HEALTH 20
@@ -24,14 +29,13 @@ typedef struct Card {
     int value;
 } Card;
 
-typedef struct CardLink {
-    Card* data;
-    struct CardLink* next;
-} CardLink;
-
+// A pile is a fixed ring of card pointers, never a chain.
+// topIndex is the slot the top card sits in; the bottom card is
+// count slots further round, wrapping back to 0 at DECK_SIZE.
+// Drawing and discarding move the two ints, never the cards.
 typedef struct Zone {
-    CardLink* topCard;
-    CardLink* bottomCard;
+    Card* cards[DECK_SIZE];
+    int topIndex;
     int count;
 } Zone;
 
@@ -39,8 +43,8 @@ typedef struct Zone {
 // The player
 // ========================================================
 typedef struct Weapon {
-    CardLink* equipped;
-    CardLink* monsterStack[MAX_MONSTER_WEAPON_STACK];
+    Card* equipped;
+    Card* monsterStack[MAX_MONSTER_WEAPON_STACK];
     int killCount;
 } Weapon;
 
@@ -58,10 +62,9 @@ typedef struct Player {
 // ========================================================
 typedef struct Game {
     Card globalCardPool[DECK_SIZE];
-    CardLink nodePool[DECK_SIZE];
     Zone mainDeck;
     Zone discardPile;
-    CardLink* roomSlots[MAX_ROOM_SIZE];
+    Card* roomSlots[MAX_ROOM_SIZE];
     Player playerOne;
     Card* lastResolvedCard;
 } Game;
@@ -94,17 +97,20 @@ typedef enum FleeResult {
     FLEE_BLOCKED
 } FleeResult;
 
+
 // ========================================================
 // Card Manipulation
 // ========================================================
-CardLink* drawTopCard(Zone* pile);
-void placeAtBottom(Zone* pile, CardLink* card);
+Card* drawTopCard(Zone* pile);
+void placeAtBottom(Zone* pile, Card* card);
+Card* cardAtPosition(Zone* pile, int position);
 
 // ========================================================
 // Builders
 // ========================================================
-void generateCardPool(Game* game, int* outTotalCards);
-void cardShuffle(CardLink** cardArray, int totalCards);
+int generateGlobalCardPool(Card* cardPool);
+void generateEncounter(Card* cardPool, EncounterType type, int startingValue, int totalToCreate, int* outTotalCards);
+void cardShuffle(Card** cardArray, int totalCards);
 void buildDeck(Game* game, int totalCards);
 void setPlayerDefault(Player* playerOne);
 
@@ -115,9 +121,10 @@ void dealRoomCards(Game* game);
 void advanceToNextRoom(Game* game);
 FleeResult fleeManager(Game* game);
 EncounterResult encounterManager(Game* game, int chosenSlot, CombatChoice combatChoice);
-void combatManager(Player* player, CardLink* monsterLink, Zone* discardPile, CombatChoice combatChoice);
-void healManager(Player* player, CardLink* potionLink, Zone* discardPile);
-void equipWeapon(Player* player, CardLink* weaponLink, Zone* discardPile);
+
+void combatManager(Player* player, Card* monster, Zone* discardPile, CombatChoice combatChoice);
+void healManager(Player* player, Card* potion, Zone* discardPile);
+void equipWeapon(Player* player, Card* weapon, Zone* discardPile);
 void discardEquippedWeapon(Player* player, Zone* discardPile);
 
 // ========================================================

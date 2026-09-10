@@ -91,10 +91,11 @@ void wakeGameMaster(GameMaster* gm) {
 }
 
 void gameSetUp(Game* session) {
-    int totalCards = 0;
 
     setPlayerDefault(&session->playerOne);
-    generateCardPool(session, &totalCards);
+
+    int totalCards = generateGlobalCardPool(session->globalCardPool);
+
     buildDeck(session, totalCards);
 
     dealRoomCards(session);

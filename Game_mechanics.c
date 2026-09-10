@@ -44,111 +44,107 @@ static WeaponState checkWeaponState(Player* player, Card* monster);
 // ========================================================
 // Card Manipulation
 // ========================================================
-CardLink* drawTopCard(Zone* pile) {
+Card* drawTopCard(Zone* pile) {
     if (pile->count == 0) return NULL;
 
-    CardLink* drawnCard = pile->topCard;
+    Card* drawnCard = cardAtPosition(pile, 0);
 
-    pile->topCard = drawnCard->next;
+    pile->cards[pile->topIndex] = NULL;
+    pile->topIndex = (pile->topIndex + 1) % DECK_SIZE;
     pile->count--;
-    drawnCard->next = NULL;
-
-    if (pile->count == 0) pile->bottomCard = NULL;
 
     return drawnCard;
 }
 
-void placeAtBottom(Zone* pile, CardLink* card) {
+void placeAtBottom(Zone* pile, Card* card) {
     if (card == NULL) return;
+    if (pile->count == DECK_SIZE) return;
 
-    card->next = NULL;
+    int bottomSlot = (pile->topIndex + pile->count) % DECK_SIZE;
 
-    if (pile->count == 0) {
-        pile->topCard = card;
-        pile->bottomCard = card;
-        pile->count++;
-        return;
-    }
-
-    pile->bottomCard->next = card;
-    pile->bottomCard = card;
+    pile->cards[bottomSlot] = card;
     pile->count++;
+}
+
+// Reads a pile from the top down: position 0 is the top card,
+// position count - 1 is the bottom one. NULL if the pile is not
+// that deep. Anything that wants to walk a pile goes through here,
+// so no file above this one has to know a pile is a ring at all.
+Card* cardAtPosition(Zone* pile, int position) {
+    if (position < 0 || position >= pile->count) return NULL;
+
+    return pile->cards[(pile->topIndex + position) % DECK_SIZE];
 }
 
 // ========================================================
 // Builders
 // ========================================================
-void generateCardPool(Game* game, int* outTotalCards) {
-    int cardValueGenerator = 2;
-    int deckIncrementer;
 
-    for (deckIncrementer = 0; deckIncrementer < 26; deckIncrementer++) {
-        if (cardValueGenerator == 15) cardValueGenerator = 2;
+// Builds the Global Card Pool and returns the total cards created.
+int generateGlobalCardPool(Card* cardPool) {
 
-        game->globalCardPool[deckIncrementer].id = deckIncrementer + 1;
-        game->globalCardPool[deckIncrementer].type = MONSTER;
-        game->globalCardPool[deckIncrementer].value = cardValueGenerator++;
-    }
+    int totalCards = 0;
 
-    cardValueGenerator = 2;
+    generateEncounter(cardPool, MONSTER, MIN_CARD_VALUE, STARTING_MONSTER_QUANTITY, &totalCards);
+    generateEncounter(cardPool, POTION, MIN_CARD_VALUE, STARTING_POTIONS_QUANTITY, &totalCards);
+    generateEncounter(cardPool, WEAPON, MIN_CARD_VALUE, STARTING_WEAPONS_QUANTITY, &totalCards);
 
-    for (deckIncrementer = 26; deckIncrementer < 35; deckIncrementer++) {
-        game->globalCardPool[deckIncrementer].id = deckIncrementer + 1;
-        game->globalCardPool[deckIncrementer].type = POTION;
-        game->globalCardPool[deckIncrementer].value = cardValueGenerator++;
-    }
-
-    cardValueGenerator = 2;
-
-    for (deckIncrementer = 35; deckIncrementer < 44; deckIncrementer++) {
-        game->globalCardPool[deckIncrementer].id = deckIncrementer + 1;
-        game->globalCardPool[deckIncrementer].type = WEAPON;
-        game->globalCardPool[deckIncrementer].value = cardValueGenerator++;
-    }
-
-    *outTotalCards = deckIncrementer;
+    return totalCards;
 }
 
-void cardShuffle(CardLink** cardArray, int totalCards) {
+// Generates an encounter based off of passed values and puts total out to a variable if desired.
+void generateEncounter(Card* cardPool, EncounterType type, int startingValue, int totalToCreate, int* outTotalCards) {
+
+    int startingIndex = (outTotalCards != NULL) ? *outTotalCards : 0;
+
+    if (startingValue < MIN_CARD_VALUE) {
+        startingValue = MIN_CARD_VALUE;
+    }
+
+    for (int incrementer = 0; incrementer < totalToCreate; incrementer++) {
+
+        int currentIndex = startingIndex + incrementer;
+
+        if (startingValue == MAX_MONSTER_ATTACK_VALUE && type == MONSTER) {
+            startingValue = MIN_CARD_VALUE;
+        }
+
+        cardPool[currentIndex].id = currentIndex + 1;
+        cardPool[currentIndex].type = type;
+        cardPool[currentIndex].value = startingValue++;
+    }
+
+    if (outTotalCards != NULL) {
+        *outTotalCards += totalToCreate;
+    }
+}
+
+void cardShuffle(Card** cardArray, int totalCards) {
     for (int currentSlot = totalCards - 1; currentSlot > 0; currentSlot--) {
         int randomSlot = rand() % (currentSlot + 1);
 
-        CardLink* cardInHand = cardArray[currentSlot];
+        Card* cardInHand = cardArray[currentSlot];
         cardArray[currentSlot] = cardArray[randomSlot];
         cardArray[randomSlot] = cardInHand;
     }
 }
 
+// The deck is dealt straight into the ring starting at slot 0, so
+// the shuffle can work on the ring itself. No temporary array, and
+// no order to stitch together afterwards.
 void buildDeck(Game* game, int totalCards) {
-    CardLink* shuffleArray[DECK_SIZE];
-
     if (totalCards <= 0 || totalCards > DECK_SIZE) return;
 
-    for (int currentSlot = 0; currentSlot < totalCards; currentSlot++) {
-        CardLink* currentLink = &game->nodePool[currentSlot];
+    Zone* deck = &game->mainDeck;
 
-        currentLink->data = &game->globalCardPool[currentSlot];
-        currentLink->next = NULL;
-
-        shuffleArray[currentSlot] = currentLink;
+    for (int currentSlot = 0; currentSlot < DECK_SIZE; currentSlot++) {
+        deck->cards[currentSlot] = (currentSlot < totalCards) ? &game->globalCardPool[currentSlot] : NULL;
     }
 
-    cardShuffle(shuffleArray, totalCards);
+    cardShuffle(deck->cards, totalCards);
 
-    game->mainDeck.topCard = shuffleArray[0];
-
-    for (int currentSlot = 0; currentSlot < totalCards - 1; currentSlot++) {
-        CardLink* currentCard = shuffleArray[currentSlot];
-        CardLink* cardDirectlyBeneath = shuffleArray[currentSlot + 1];
-
-        currentCard->next = cardDirectlyBeneath;
-    }
-
-    int lastCardIndex = totalCards - 1;
-    shuffleArray[lastCardIndex]->next = NULL;
-
-    game->mainDeck.bottomCard = shuffleArray[lastCardIndex];
-    game->mainDeck.count = totalCards;
+    deck->topIndex = 0;
+    deck->count = totalCards;
 }
 
 void setPlayerDefault(Player* playerOne) {
@@ -208,8 +204,7 @@ EncounterResult encounterManager(Game* game, int chosenSlot, CombatChoice combat
     if (!canEncounterCards(game)) return ENCOUNTER_BLOCKED_ROOM_NOT_CLEARED;
     if (isRoomSlotEmpty(game, chosenSlot)) return ENCOUNTER_BLOCKED_EMPTY_SLOT;
 
-    CardLink* cardLinkOnTable = game->roomSlots[chosenSlot];
-    Card* actualCard = cardLinkOnTable->data;
+    Card* cardOnTable = game->roomSlots[chosenSlot];
 
     Player* player = &game->playerOne;
     Zone* discardPile = &game->discardPile;
@@ -217,31 +212,30 @@ EncounterResult encounterManager(Game* game, int chosenSlot, CombatChoice combat
     setCanFleeFalse(player);
 
     game->roomSlots[chosenSlot] = NULL;
-    game->lastResolvedCard = actualCard;
+    game->lastResolvedCard = cardOnTable;
 
-    switch (actualCard->type) {
+    switch (cardOnTable->type) {
         case MONSTER:
-            combatManager(player, cardLinkOnTable, discardPile, combatChoice);
+            combatManager(player, cardOnTable, discardPile, combatChoice);
             break;
 
         case POTION:
-            healManager(player, cardLinkOnTable, discardPile);
+            healManager(player, cardOnTable, discardPile);
             break;
 
         case WEAPON:
-            equipWeapon(player, cardLinkOnTable, discardPile);
+            equipWeapon(player, cardOnTable, discardPile);
             break;
 
         default:
-            placeAtBottom(discardPile, cardLinkOnTable);
+            placeAtBottom(discardPile, cardOnTable);
             break;
     }
 
     return ENCOUNTER_RESOLVED;
 }
 
-void combatManager(Player* player, CardLink* monsterLink, Zone* discardPile, CombatChoice combatChoice) {
-    Card* monster = monsterLink->data;
+void combatManager(Player* player, Card* monster, Zone* discardPile, CombatChoice combatChoice) {
     bool useWeapon = willUseWeapon(player, monster, combatChoice);
 
     int damageTaken = decideDamageValue(player, monster, combatChoice);
@@ -250,38 +244,38 @@ void combatManager(Player* player, CardLink* monsterLink, Zone* discardPile, Com
     setPlayerHealth(player, newHealth);
 
     if (!useWeapon) {
-        placeAtBottom(discardPile, monsterLink);
+        placeAtBottom(discardPile, monster);
         return;
     }
 
     if (player->weapon.killCount >= MAX_MONSTER_WEAPON_STACK) {
-        placeAtBottom(discardPile, monsterLink);
+        placeAtBottom(discardPile, monster);
         return;
     }
 
-    player->weapon.monsterStack[player->weapon.killCount] = monsterLink;
+    player->weapon.monsterStack[player->weapon.killCount] = monster;
     player->weapon.killCount++;
 }
 
-void healManager(Player* player, CardLink* potionLink, Zone* discardPile) {
+void healManager(Player* player, Card* potion, Zone* discardPile) {
     if (player->potionUsedThisTurn) {
-        placeAtBottom(discardPile, potionLink);
+        placeAtBottom(discardPile, potion);
         return;
     }
 
-    int healValue = potionLink->data->value;
+    int healValue = potion->value;
     int newHealth = clampedPlayerHeal(player->health, player->minHealth, player->maxHealth, healValue);
 
     setPlayerHealth(player, newHealth);
     player->potionUsedThisTurn = true;
 
-    placeAtBottom(discardPile, potionLink);
+    placeAtBottom(discardPile, potion);
 }
 
-void equipWeapon(Player* player, CardLink* weaponLink, Zone* discardPile) {
+void equipWeapon(Player* player, Card* weapon, Zone* discardPile) {
     discardEquippedWeapon(player, discardPile);
 
-    player->weapon.equipped = weaponLink;
+    player->weapon.equipped = weapon;
     player->weapon.killCount = 0;
 }
 
@@ -318,13 +312,13 @@ int calculateFinalScore(Game* game) {
 
 int sumRemainingMonsterValues(Zone* pile) {
     int runningTotal = 0;
-    CardLink* currentLink = pile->topCard;
 
-    while (currentLink != NULL) {
-        if (currentLink->data->type == MONSTER) {
-            runningTotal += currentLink->data->value;
+    for (int position = 0; position < pile->count; position++) {
+        Card* currentCard = cardAtPosition(pile, position);
+
+        if (currentCard->type == MONSTER) {
+            runningTotal += currentCard->value;
         }
-        currentLink = currentLink->next;
     }
 
     return runningTotal;
@@ -429,7 +423,7 @@ EncounterPrompt requiredEncounterPrompt(Game* game, int slotIndex) {
     if (isRoomSlotEmpty(game, slotIndex)) return ENCOUNTER_PROMPT_NONE;
 
     Player* player = &game->playerOne;
-    Card* chosenCard = game->roomSlots[slotIndex]->data;
+    Card* chosenCard = game->roomSlots[slotIndex];
 
     switch (chosenCard->type) {
         case MONSTER:
@@ -452,13 +446,13 @@ EncounterPrompt requiredEncounterPrompt(Game* game, int slotIndex) {
 int getSlotCardValue(Game* game, int slotIndex) {
     if (isRoomSlotEmpty(game, slotIndex)) return 0;
 
-    return game->roomSlots[slotIndex]->data->value;
+    return game->roomSlots[slotIndex]->value;
 }
 
 int previewDamageTaken(Game* game, int slotIndex, CombatChoice combatChoice) {
     if (isRoomSlotEmpty(game, slotIndex)) return 0;
 
-    Card* chosenCard = game->roomSlots[slotIndex]->data;
+    Card* chosenCard = game->roomSlots[slotIndex];
     int rawDamage = decideDamageValue(&game->playerOne, chosenCard, combatChoice);
 
     return preventNegative(rawDamage);
@@ -538,7 +532,7 @@ int countCardsInRoom(Game* game) {
 int getEquippedWeaponValue(Player* player) {
     if (player->weapon.equipped == NULL) return 0;
 
-    return player->weapon.equipped->data->value;
+    return player->weapon.equipped->value;
 }
 
 int getLastKillValue(Player* player) {
@@ -546,5 +540,5 @@ int getLastKillValue(Player* player) {
 
     int lastKillIndex = player->weapon.killCount - 1;
 
-    return player->weapon.monsterStack[lastKillIndex]->data->value;
+    return player->weapon.monsterStack[lastKillIndex]->value;
 }
