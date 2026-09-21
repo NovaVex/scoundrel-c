@@ -1,16 +1,33 @@
 #pragma once
 #include <stdbool.h>
+#include <iso646.h>
 
+//Deck Definitions
 #define DECK_SIZE 52
 #define MIN_CARD_VALUE 2
-#define MAX_MONSTER_ATTACK_VALUE 15
-#define STARTING_MONSTER_QUANTITY 26
-#define STARTING_POTIONS_QUANTITY 9
-#define STARTING_WEAPONS_QUANTITY 9
+#define MAX_MONSTER_ATTACK_VALUE 14
+#define MAIN_MODE_MONSTER_QUANTITY 26
+#define MAIN_MODE_POTIONS_QUANTITY 9
+#define MAIN_MODE_WEAPONS_QUANTITY 9
+
+//Rigged Deck Definitions
+#define RIGGED_WEAPON_STARTING_VALUE 5
+#define RIGGED_WEAPONS_QUANTITY 2
+#define RIGGED_MONSTER_QUANTITY 4
+#define RIGGED_POTIONS_QUANTITY 2
+
+//Room Definitions
 #define MAX_ROOM_SIZE 4
 #define MAX_MONSTER_WEAPON_STACK 26
-#define STARTING_HEALTH 20
-#define MINIMUM_HEALTH 0
+
+//Player Definitions
+#define PLAYER_DEFAULT_HEALTH 20
+#define PLAYER_DEFAULT_FLEE_STATE true
+#define PLAYER_DEFAULT_POTION_STATE false
+#define PLAYER_DEFAULT_WEAPON NULL
+#define PLAYER_DEFAULT_KILL_COUNT 0
+#define PLAYER_MINIMUM_HEALTH 0
+#define PLAYER_MAX_HEALTH 20
 
 // ========================================================
 // Cards and piles
@@ -29,10 +46,8 @@ typedef struct Card {
     int value;
 } Card;
 
-// A pile is a fixed ring of card pointers, never a chain.
-// topIndex is the slot the top card sits in; the bottom card is
-// count slots further round, wrapping back to 0 at DECK_SIZE.
-// Drawing and discarding move the two ints, never the cards.
+// A fixed ring of card pointers. topIndex is the top card; drawing
+// and discarding move topIndex and count, never the cards.
 typedef struct Zone {
     Card* cards[DECK_SIZE];
     int topIndex;
@@ -49,8 +64,6 @@ typedef struct Weapon {
 } Weapon;
 
 typedef struct Player {
-    int minHealth;
-    int maxHealth;
     int health;
     Weapon weapon;
     bool canFlee;
@@ -97,7 +110,6 @@ typedef enum FleeResult {
     FLEE_BLOCKED
 } FleeResult;
 
-
 // ========================================================
 // Card Manipulation
 // ========================================================
@@ -109,7 +121,8 @@ Card* cardAtPosition(Zone* pile, int position);
 // Builders
 // ========================================================
 int generateGlobalCardPool(Card* cardPool);
-void generateEncounter(Card* cardPool, EncounterType type, int startingValue, int totalToCreate, int* outTotalCards);
+int generateRiggedCardPool(Card* cardPool);
+void generateEncounter(Card* cardPool, EncounterType type, int startingValue, int totalToCreate, int* runningTotal);
 void cardShuffle(Card** cardArray, int totalCards);
 void buildDeck(Game* game, int totalCards);
 void setPlayerDefault(Player* playerOne);
@@ -118,7 +131,8 @@ void setPlayerDefault(Player* playerOne);
 // Managers
 // ========================================================
 void dealRoomCards(Game* game);
-void advanceToNextRoom(Game* game);
+void advanceToNextRoom(Game* game, bool canFleeNextRoom);
+void returnRoomToDeck(Game* game);
 FleeResult fleeManager(Game* game);
 EncounterResult encounterManager(Game* game, int chosenSlot, CombatChoice combatChoice);
 
@@ -135,7 +149,7 @@ int sumRemainingMonsterValues(Zone* pile);
 bool hasPotionVictoryBonus(Game* game);
 
 // ========================================================
-// Helpers
+// Helpers: Questions
 // ========================================================
 bool isRoomSlotEmpty(Game* game, int slotIndex);
 bool isPlayerDead(Player* player);
@@ -144,23 +158,35 @@ bool isGameOver(Game* game);
 bool canEncounterCards(Game* game);
 bool isRoomComplete(Game* game);
 bool isGameSessionActive(Game* game);
+
+// ========================================================
+// Helpers: Combat
+// ========================================================
 int decideDamageValue(Player* player, Card* monster, CombatChoice combatChoice);
 bool weaponUsableOnMonster(Player* player, Card* monster);
-bool willUseWeapon(Player* player, Card* monster, CombatChoice combatChoice);
+
+// ========================================================
+// Helpers: Previews for the screens
+// ========================================================
 EncounterPrompt requiredEncounterPrompt(Game* game, int slotIndex);
 int getSlotCardValue(Game* game, int slotIndex);
 int previewDamageTaken(Game* game, int slotIndex, CombatChoice combatChoice);
 int pendingWeaponDiscardCount(Player* player);
 bool wouldPotionBeWasted(Player* player);
-int clampedDamageToPlayer(int rawHealth, int minHealth, int maxHealth, int rawDamageDealt);
-int damageCalculation(int currentHealth, int damageTaken);
-int healCalculation(int currentHealth, int healValue);
-int clampedPlayerHeal(int rawHealth, int minHealth, int maxHealth, int rawHeal);
+
+// ========================================================
+// Helpers: Health
+// ========================================================
+void applyDamage(Player* player, int damageTaken);
+void applyHeal(Player* player, int healValue);
 void setPlayerHealth(Player* player, int valueToSet);
 int clamp(int value, int minimum, int maximum);
 int preventNegative(int value);
-void setCanFleeFalse(Player* player);
-void setCanFleeTrue(Player* player);
+
+// ========================================================
+// Helpers: Player and room state
+// ========================================================
+void setPlayerCanFlee(Player* player, bool state);
 void startNewTurn(Player* player);
 int countCardsInRoom(Game* game);
 int getEquippedWeaponValue(Player* player);

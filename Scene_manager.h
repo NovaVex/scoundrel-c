@@ -3,6 +3,9 @@
 #include "Game_mechanics.h"
 #include "Game_master.h"
 
+//Display Definitions
+#define SLOT_DISPLAY_OFFSET 1   // slots are 0-3 inside, shown as 1-4
+
 // ========================================================
 // Basic utilities
 // ========================================================
@@ -19,6 +22,7 @@ void renderMenuOption(int optionKey, const char* label);
 void renderToggleOption(int optionKey, const char* label, bool isEnabled);
 void renderPrompt(const char* label);
 void renderDebugLine(GameMaster* gm, int optionKey);
+void renderMonsterTitle(int monsterValue);
 
 // ========================================================
 // Messages
@@ -58,11 +62,9 @@ void openGameOverScene(bool playerDied, int finalScore);
 void renderCombatChoicePrompt(Game* session, int chosenSlot);
 CombatChoice promptCombatChoice(Game* session, int chosenSlot);
 void renderBareHandedConfirm(Game* session, int chosenSlot);
-bool promptBareHandedConfirm(Game* session, int chosenSlot);
-void renderWeaponSwapConfirm(int cardsAtRisk);
-bool promptWeaponSwapConfirm(Game* session);
+void renderWeaponSwapConfirm(Player* player);
 void renderPotionWasteConfirm(void);
-bool promptPotionWasteConfirm(Game* session);
+bool promptConfirm(Game* session, EncounterPrompt prompt, int chosenSlot);
 
 // ========================================================
 // Turn flow
@@ -77,8 +79,16 @@ void reportEncounterResult(EncounterResult result);
 void renderDebugMenu(void);
 void openDebugMenu(GameMaster* gm, Game* session);
 void debugGenerateTempTestDeck(void);
+
+// ========================================================
+// Debug printing (targeted)
+// ========================================================
 void printCurrentPlayerStats(Game* session);
 void printEntireDeckLoop(Zone* pile);
+
+// ========================================================
+// Debug tools (session level)
+// ========================================================
 void printSessionDeck(Game* session);
 void printDiscardPile(Game* session);
 void printDungeonRoom(Game* session);

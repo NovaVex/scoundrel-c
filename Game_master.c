@@ -1,39 +1,12 @@
 // ========================================================
 // Game_master.c
 // --------------------------------------------------------
-// JOB
-//   The conductor. It owns the loops and decides which screen
-//   the player is looking at. It holds no rules and prints
-//   nothing itself.
+// The conductor: loops, state machines and settings.
+// No rules and no printing.
 //
-// THE TWO STATE MACHINES
-//   gameMaster()  outer loop: main menu / options / in game
-//   gameLoop()    inner loop: active / paused / options / game over
-//
-//   Each loop just asks "what state am I in?", calls the one
-//   manager for that state, and that manager returns the next
-//   state. Nothing else happens in the loops.
-//
-// ONE TURN, START TO FINISH
-//   Follow this once and the whole program makes sense:
-//
-//   1. activeGameManager() asks Game_mechanics: is the game over?
-//   2. ...and: is the room finished? (isRoomComplete)
-//         if yes -> show the turn-complete screen, deal the next
-//                   room, done. The player is never asked.
-//   3. otherwise -> runActiveGameScene() draws the room and
-//                   returns whatever key the player pressed
-//   4. the switch below turns that key into one action:
-//         slot 1-4 -> runEncounterScene()   (Scene_manager.c)
-//         5        -> runFleeScene()        (Scene_manager.c)
-//         9        -> pause
-//   5. the scene asks any needed question, then hands the answer
-//      to Game_mechanics.c, which changes the game state
-//   6. back to step 1
-//
-// WHAT THIS FILE CALLS
-//   Scene_manager.h    to show screens and collect choices
-//   Game_mechanics.h   to ask about game state and apply turns
+// gameMaster()  outer loop: main menu / options / in game
+// gameLoop()    inner loop: active / paused / game over
+// Each loop calls the manager for its state, which returns the next state.
 // ========================================================
 
 #include "Game_master.h"
@@ -51,10 +24,10 @@ int gameMaster(void) {
 
     wakeGameMaster(&gm);
 
-    while (gm.gameState != SYSTEM_EXIT) {
-        switch (gm.gameState) {
+    while (gm.systemState != SYSTEM_EXIT) {
+        switch (gm.systemState) {
             case SYSTEM_MAIN_MENU:
-                routeMainMenuChoice(&gm, openMainMenu(&gm));
+                gm.systemState = mainMenuManager(&gm);
                 break;
 
             case SYSTEM_IN_GAME:
@@ -63,12 +36,12 @@ int gameMaster(void) {
 
             case SYSTEM_OPTIONS:
                 optionsLoop(&gm);
-                gm.gameState = SYSTEM_MAIN_MENU;
+                gm.systemState = SYSTEM_MAIN_MENU;
                 break;
 
             case SYSTEM_EXIT:
             default:
-                gm.gameState = SYSTEM_EXIT;
+                gm.systemState = SYSTEM_EXIT;
                 break;
         }
     }
@@ -80,23 +53,36 @@ int gameMaster(void) {
 // Initialization
 // ========================================================
 void wakeGameMaster(GameMaster* gm) {
-    gm->debugMenuEnabled = false;
-    gm->debugOpen = false;
-    gm->autoResolveCombat = false;
-    gm->autoConfirmWeaponSwap = false;
-    gm->gameState = SYSTEM_MAIN_MENU;
+    setGameSettingsDefault(gm);
+
+    gm->isDebugMenuOpen = false;
+    gm->systemState     = SYSTEM_MAIN_MENU;
 
     initializeDisplay();
     randomNumberGenerator(gm);
 }
 
-void gameSetUp(Game* session) {
+//Need to work on.
+void setGameSettingsDefault(GameMaster* gm) {
+    setSetting(gm, SETTING_DEBUG_MODE, DEBUG_MODE_DEFAULT);
+    setSetting(gm, SETTING_AUTO_RESOLVE_COMBAT, AUTO_RESOLVE_COMBAT_DEFAULT);
+    setSetting(gm, SETTING_AUTO_CONFIRM_WEAPON_SWAP, AUTO_CONFIRM_WEAPON_SWAP_DEFAULT);
+    setSetting(gm, SETTING_RIGGED_DECK, RIGGED_DECK_DEFAULT);
+}
 
+// The rigged deck is never shuffled.
+void gameSetUp(Game* session, bool useRiggedDeck) {
     setPlayerDefault(&session->playerOne);
 
-    int totalCards = generateGlobalCardPool(session->globalCardPool);
+    // The rigged pool if useRiggedDeck is on, otherwise the normal pool
+    int totalCards = useRiggedDeck ? generateRiggedCardPool(session->globalCardPool)
+                                   : generateGlobalCardPool(session->globalCardPool);
 
     buildDeck(session, totalCards);
+
+    if (!useRiggedDeck) {   // If this is a normal deck
+        cardShuffle(session->mainDeck.cards, totalCards);
+    }
 
     dealRoomCards(session);
 }
@@ -106,7 +92,7 @@ void randomNumberGenerator(GameMaster* gm) {
 
     srand(startingSeed);
 
-    int rngToSkip = rand() % 100;
+    int rngToSkip = rand() % RNG_WARMUP_MAX_SKIPS;   // random number from 0 up to RNG_WARMUP_MAX_SKIPS - 1
 
     for (int rngIncrementer = 0; rngIncrementer < rngToSkip; rngIncrementer++) {
         rand();
@@ -118,53 +104,56 @@ void randomNumberGenerator(GameMaster* gm) {
 // ========================================================
 // System routing
 // ========================================================
-void routeMainMenuChoice(GameMaster* gm, int playerChoice) {
+SystemState mainMenuManager(GameMaster* gm) {
+    int playerChoice = openMainMenu(gm);
+
     switch (playerChoice) {
         case MENU_START_GAME:
-            gm->gameState = SYSTEM_IN_GAME;
-            break;
+            return SYSTEM_IN_GAME;
 
         case MENU_OPTIONS:
-            gm->gameState = SYSTEM_OPTIONS;
-            break;
+            return SYSTEM_OPTIONS;
 
         case MENU_DEBUG:
             openDebugMenu(gm, NULL);
             break;
 
         case INPUT_DEBUG_COMMAND:
-            gm->debugMenuEnabled = !gm->debugMenuEnabled;
+            toggleSetting(gm, SETTING_DEBUG_MODE);
             break;
 
         case MENU_QUIT:
         case INPUT_END_OF_STREAM:
-            gm->gameState = SYSTEM_EXIT;
-            break;
+            return SYSTEM_EXIT;
 
         default:
             break;
     }
+
+    return SYSTEM_MAIN_MENU;
 }
 
+//TODO: not quiet sure what the AI was on. Possible Clean up.
 void applyOptionsToggle(GameMaster* gm, int playerChoice) {
     switch (playerChoice) {
-        // One-way switch by design. The options screen only draws this
-        // line while the egg is already armed, so its job is to put the
-        // tools away again. Typing "debug" at the main menu stays the
-        // only way to arm them, and pressing 1 on a hidden line does
-        // nothing rather than quietly handing them over.
+        // Off only. Typing "debug" at the main menu is the only way on.
         case OPTIONS_TOGGLE_DEBUG:
-            if (!gm->debugMenuEnabled) break;
-
-            gm->debugMenuEnabled = false;
+            setSetting(gm, SETTING_DEBUG_MODE, false);
             break;
 
         case OPTIONS_TOGGLE_AUTO_COMBAT:
-            gm->autoResolveCombat = !gm->autoResolveCombat;
+            toggleSetting(gm, SETTING_AUTO_RESOLVE_COMBAT);
             break;
 
         case OPTIONS_TOGGLE_AUTO_EQUIP:
-            gm->autoConfirmWeaponSwap = !gm->autoConfirmWeaponSwap;
+            toggleSetting(gm, SETTING_AUTO_CONFIRM_WEAPON_SWAP);
+            break;
+
+        // Hidden with the debug line, so it does nothing unless debug is on.
+        case OPTIONS_TOGGLE_RIGGED_DECK:
+            if (!isSettingOn(gm, SETTING_DEBUG_MODE)) break;   // If debug mode is off, do nothing
+
+            toggleSetting(gm, SETTING_RIGGED_DECK);
             break;
 
         default:
@@ -173,9 +162,7 @@ void applyOptionsToggle(GameMaster* gm, int playerChoice) {
 }
 
 void optionsLoop(GameMaster* gm) {
-    bool optionsOpen = true;
-
-    while (optionsOpen) {
+    while (true) {
         int playerChoice = openOptionsScene(gm);
 
         if (playerChoice == OPTIONS_BACK) return;
@@ -192,7 +179,11 @@ void gameLoop(GameMaster* gm) {
     Game session = {0};
     InGameState currentGameState = PLAYING_ACTIVE;
 
-    gameSetUp(&session);
+    // Turning debug off also turns the rigged deck off.
+    // && means AND: debug mode and the rigged deck must both be on
+    bool useRiggedDeck = isSettingOn(gm, SETTING_DEBUG_MODE) && isSettingOn(gm, SETTING_RIGGED_DECK);
+
+    gameSetUp(&session, useRiggedDeck);
 
     while (currentGameState != PLAYING_EXIT) {
         switch (currentGameState) {
@@ -202,10 +193,6 @@ void gameLoop(GameMaster* gm) {
 
             case PLAYING_PAUSED:
                 currentGameState = activeGamePauseManager(&session, gm);
-                break;
-
-            case PLAYING_OPTIONS:
-                currentGameState = activeGameOptionsManager(&session, gm);
                 break;
 
             case PLAYING_GAMEOVER:
@@ -219,7 +206,7 @@ void gameLoop(GameMaster* gm) {
         }
     }
 
-    gm->gameState = SYSTEM_MAIN_MENU;
+    gm->systemState = SYSTEM_MAIN_MENU;
 }
 
 // ========================================================
@@ -230,7 +217,7 @@ InGameState activeGameManager(Game* session, GameMaster* gm) {
 
     if (isRoomComplete(session)) {
         runTurnCompleteScene(session);
-        advanceToNextRoom(session);
+        advanceToNextRoom(session, PLAYER_DEFAULT_FLEE_STATE);
         return PLAYING_ACTIVE;
     }
 
@@ -241,7 +228,8 @@ InGameState activeGameManager(Game* session, GameMaster* gm) {
         case INPUT_SLOT_1:
         case INPUT_SLOT_2:
         case INPUT_SLOT_3:
-            runEncounterScene(session, gm, playerChoice - 1);
+            // Keys 1-4 map to slots 0-3. See renderActionMenu.
+            runEncounterScene(session, gm, playerChoice - INPUT_SLOT_0);
             break;
 
         case INPUT_FLEE:
@@ -269,7 +257,8 @@ InGameState activeGamePauseManager(Game* session, GameMaster* gm) {
             return PLAYING_ACTIVE;
 
         case PAUSE_OPTIONS:
-            return PLAYING_OPTIONS;
+            optionsLoop(gm);
+            return PLAYING_PAUSED;
 
         case PAUSE_DEBUG:
             openDebugMenu(gm, session);
@@ -286,21 +275,8 @@ InGameState activeGamePauseManager(Game* session, GameMaster* gm) {
     return PLAYING_PAUSED;
 }
 
-InGameState activeGameOptionsManager(Game* session, GameMaster* gm) {
-    (void)session;
-
-    int playerChoice = openOptionsScene(gm);
-
-    if (playerChoice == OPTIONS_BACK) return PLAYING_PAUSED;
-    if (playerChoice == INPUT_END_OF_STREAM) return PLAYING_EXIT;
-
-    applyOptionsToggle(gm, playerChoice);
-
-    return PLAYING_OPTIONS;
-}
-
 InGameState activeGameOverManager(Game* session, GameMaster* gm) {
-    (void)gm;
+    (void)gm;   // tells the compiler gm is unused on purpose
 
     bool playerDied = isPlayerDead(&session->playerOne);
     int finalScore = calculateFinalScore(session);
@@ -308,4 +284,21 @@ InGameState activeGameOverManager(Game* session, GameMaster* gm) {
     openGameOverScene(playerDied, finalScore);
 
     return PLAYING_EXIT;
+}
+
+// ========================================================
+// Settings
+// ========================================================
+bool isSettingOn(GameMaster* gm, SettingID setting) {
+    return gm->settings.toggles[setting];
+}
+
+void setSetting(GameMaster* gm, SettingID setting, bool state) {
+    gm->settings.toggles[setting] = state;
+}
+
+void toggleSetting(GameMaster* gm, SettingID setting) {
+    bool flippedState = !isSettingOn(gm, setting);   // the opposite of what it is now
+
+    setSetting(gm, setting, flippedState);
 }

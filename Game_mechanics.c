@@ -1,79 +1,51 @@
 // ========================================================
 // Game_mechanics.c
 // --------------------------------------------------------
-// JOB
-//   The rules. This is the file that actually knows how
-//   Scoundrel is played. It is the only file that changes
-//   game state.
+// The rules, and the only file that changes game state.
+// No stdio: it returns values and the layers above print.
+// That keeps it portable into a game engine later.
 //
-// THE HARD RULE
-//   No stdio. No printf. Not one. If this file needs to tell
-//   the player something, it returns a value and lets the
-//   layers above decide how to say it. That is what keeps it
-//   portable into a game engine later.
-//
-// WHO CALLS THIS FILE
-//   Game_master.c    to run turns
-//   Scene_manager.c  to ask what is legal before asking the player
-//   UI_manager.c     to ask for numbers to display (read only)
-//
-// MAP OF THIS FILE, IN ORDER
-//   CARD MANIPULATION  moving cards between piles
-//   BUILDERS           making the deck and the starting player
-//   MANAGERS           the ones that resolve a turn:
-//                      encounterManager, combatManager,
-//                      healManager, equipWeapon, fleeManager
-//   SCORING            final score at game over
-//   HELPERS            the questions. Most are one line and
-//                      answer exactly one thing. This is the
-//                      long section, but nothing in it is deep.
+// Card Manipulation, Builders, Managers, Scoring, then Helpers
+// (Questions, Combat, Previews, Health, Player and room state).
 // ========================================================
 
 #include "Game_mechanics.h"
 #include <stdlib.h>
 
-typedef enum WeaponState {
-    WEAPON_NONE,
-    WEAPON_FRESH,
-    WEAPON_VALID_COMBO,
-    WEAPON_INVALID_COMBO
-} WeaponState;
-
-static WeaponState checkWeaponState(Player* player, Card* monster);
-
 // ========================================================
 // Card Manipulation
 // ========================================================
+//OK
 Card* drawTopCard(Zone* pile) {
     if (pile->count == 0) return NULL;
 
     Card* drawnCard = cardAtPosition(pile, 0);
 
     pile->cards[pile->topIndex] = NULL;
-    pile->topIndex = (pile->topIndex + 1) % DECK_SIZE;
+    pile->topIndex = (pile->topIndex + 1) % DECK_SIZE;   // step down one slot, wrapping back to 0 at DECK_SIZE
     pile->count--;
 
     return drawnCard;
 }
 
+//OK
 void placeAtBottom(Zone* pile, Card* card) {
     if (card == NULL) return;
     if (pile->count == DECK_SIZE) return;
 
-    int bottomSlot = (pile->topIndex + pile->count) % DECK_SIZE;
+    int bottomSlot = (pile->topIndex + pile->count) % DECK_SIZE;   // count slots past the top, wrapping at DECK_SIZE
 
     pile->cards[bottomSlot] = card;
     pile->count++;
 }
 
-// Reads a pile from the top down: position 0 is the top card,
-// position count - 1 is the bottom one. NULL if the pile is not
-// that deep. Anything that wants to walk a pile goes through here,
-// so no file above this one has to know a pile is a ring at all.
+//Grabs and returns the card at the position requested.
 Card* cardAtPosition(Zone* pile, int position) {
-    if (position < 0 || position >= pile->count) return NULL;
+    if (position < 0 || position >= pile->count) return NULL;      // || means OR: before the top, or past the bottom
 
-    return pile->cards[(pile->topIndex + position) % DECK_SIZE];
+    int ringSlot = (pile->topIndex + position) % DECK_SIZE;         // position slots past the top, wrapping at DECK_SIZE
+
+    return pile->cards[ringSlot];
 }
 
 // ========================================================
@@ -82,30 +54,41 @@ Card* cardAtPosition(Zone* pile, int position) {
 
 // Builds the Global Card Pool and returns the total cards created.
 int generateGlobalCardPool(Card* cardPool) {
-
     int totalCards = 0;
 
-    generateEncounter(cardPool, MONSTER, MIN_CARD_VALUE, STARTING_MONSTER_QUANTITY, &totalCards);
-    generateEncounter(cardPool, POTION, MIN_CARD_VALUE, STARTING_POTIONS_QUANTITY, &totalCards);
-    generateEncounter(cardPool, WEAPON, MIN_CARD_VALUE, STARTING_WEAPONS_QUANTITY, &totalCards);
+    generateEncounter(cardPool, MONSTER, MIN_CARD_VALUE, MAIN_MODE_MONSTER_QUANTITY, &totalCards);
+    generateEncounter(cardPool, POTION, MIN_CARD_VALUE, MAIN_MODE_POTIONS_QUANTITY, &totalCards);
+    generateEncounter(cardPool, WEAPON, MIN_CARD_VALUE, MAIN_MODE_WEAPONS_QUANTITY, &totalCards);
+
+    return totalCards;
+}
+
+// Debug deck, dealt unshuffled. Monsters only add up to 14, so you can't lose.
+int generateRiggedCardPool(Card* cardPool) {
+    int totalCards = 0;
+
+    generateEncounter(cardPool, WEAPON, RIGGED_WEAPON_STARTING_VALUE, RIGGED_WEAPONS_QUANTITY, &totalCards);
+    generateEncounter(cardPool, MONSTER, MIN_CARD_VALUE, RIGGED_MONSTER_QUANTITY, &totalCards);
+    generateEncounter(cardPool, POTION, MIN_CARD_VALUE, RIGGED_POTIONS_QUANTITY, &totalCards);
 
     return totalCards;
 }
 
 // Generates an encounter based off of passed values and puts total out to a variable if desired.
-void generateEncounter(Card* cardPool, EncounterType type, int startingValue, int totalToCreate, int* outTotalCards) {
+void generateEncounter(Card* cardPool, EncounterType type, int startingValue, int totalToCreate, int* runningTotal) {
+                        //REMEMBER. TRUE CONDITION ? FALSE CONDITION : ELSE CONDITION
+    int startingIndex = (runningTotal != NULL) ? *runningTotal : 0;
 
-    int startingIndex = (outTotalCards != NULL) ? *outTotalCards : 0;
+    if (startingIndex + totalToCreate > DECK_SIZE) return;
 
     if (startingValue < MIN_CARD_VALUE) {
         startingValue = MIN_CARD_VALUE;
     }
 
     for (int incrementer = 0; incrementer < totalToCreate; incrementer++) {
-
         int currentIndex = startingIndex + incrementer;
 
-        if (startingValue == MAX_MONSTER_ATTACK_VALUE && type == MONSTER) {
+        if (startingValue > MAX_MONSTER_ATTACK_VALUE && type == MONSTER) {   // && means AND: both must be true
             startingValue = MIN_CARD_VALUE;
         }
 
@@ -114,14 +97,14 @@ void generateEncounter(Card* cardPool, EncounterType type, int startingValue, in
         cardPool[currentIndex].value = startingValue++;
     }
 
-    if (outTotalCards != NULL) {
-        *outTotalCards += totalToCreate;
+    if (runningTotal != NULL) {
+        *runningTotal += totalToCreate;   // same as: *runningTotal = *runningTotal + totalToCreate
     }
 }
 
 void cardShuffle(Card** cardArray, int totalCards) {
     for (int currentSlot = totalCards - 1; currentSlot > 0; currentSlot--) {
-        int randomSlot = rand() % (currentSlot + 1);
+        int randomSlot = rand() % (currentSlot + 1);                           // random slot from 0 up to currentSlot
 
         Card* cardInHand = cardArray[currentSlot];
         cardArray[currentSlot] = cardArray[randomSlot];
@@ -129,33 +112,27 @@ void cardShuffle(Card** cardArray, int totalCards) {
     }
 }
 
-// The deck is dealt straight into the ring starting at slot 0, so
-// the shuffle can work on the ring itself. No temporary array, and
-// no order to stitch together afterwards.
+// Deals the pool into the ring in order. Shuffle afterwards with cardShuffle.
 void buildDeck(Game* game, int totalCards) {
-    if (totalCards <= 0 || totalCards > DECK_SIZE) return;
+    if (totalCards <= 0 || totalCards > DECK_SIZE) return;   // || means OR: no cards, or too many
 
     Zone* deck = &game->mainDeck;
 
     for (int currentSlot = 0; currentSlot < DECK_SIZE; currentSlot++) {
+                                    //REMEMBER. TRUE CONDITION ? FALSE CONDITION : ELSE CONDITION
         deck->cards[currentSlot] = (currentSlot < totalCards) ? &game->globalCardPool[currentSlot] : NULL;
     }
-
-    cardShuffle(deck->cards, totalCards);
 
     deck->topIndex = 0;
     deck->count = totalCards;
 }
 
 void setPlayerDefault(Player* playerOne) {
-    playerOne->minHealth = MINIMUM_HEALTH;
-    playerOne->maxHealth = STARTING_HEALTH;
-    playerOne->health = STARTING_HEALTH;
-    playerOne->canFlee = true;
-    playerOne->potionUsedThisTurn = false;
-
-    playerOne->weapon.equipped = NULL;
-    playerOne->weapon.killCount = 0;
+    playerOne->health = PLAYER_DEFAULT_HEALTH;
+    playerOne->canFlee = PLAYER_DEFAULT_FLEE_STATE;
+    playerOne->potionUsedThisTurn = PLAYER_DEFAULT_POTION_STATE;
+    playerOne->weapon.equipped = PLAYER_DEFAULT_WEAPON;
+    playerOne->weapon.killCount = PLAYER_DEFAULT_KILL_COUNT;
 
     for (int stackIndex = 0; stackIndex < MAX_MONSTER_WEAPON_STACK; stackIndex++) {
         playerOne->weapon.monsterStack[stackIndex] = NULL;
@@ -170,38 +147,39 @@ void dealRoomCards(Game* game) {
 
     for (int roomSlot = 0; roomSlot < MAX_ROOM_SIZE; roomSlot++) {
         if (deck->count == 0) return;
+        if (!isRoomSlotEmpty(game, roomSlot)) continue;   // If the slot is not empty, skip it
 
-        if (isRoomSlotEmpty(game, roomSlot)) {
-            game->roomSlots[roomSlot] = drawTopCard(deck);
-        }
+        game->roomSlots[roomSlot] = drawTopCard(deck);
     }
 }
 
-void advanceToNextRoom(Game* game) {
+// Fleeing passes false so the player can't flee twice in a row.
+void advanceToNextRoom(Game* game, bool canFleeNextRoom) {
     dealRoomCards(game);
     startNewTurn(&game->playerOne);
-    setCanFleeTrue(&game->playerOne);
+    setPlayerCanFlee(&game->playerOne, canFleeNextRoom);
 }
 
-FleeResult fleeManager(Game* game) {
-    if (game->playerOne.canFlee == false) return FLEE_BLOCKED;
-
+void returnRoomToDeck(Game* game) {
     for (int roomSlot = 0; roomSlot < MAX_ROOM_SIZE; roomSlot++) {
         if (isRoomSlotEmpty(game, roomSlot)) continue;
 
         placeAtBottom(&game->mainDeck, game->roomSlots[roomSlot]);
         game->roomSlots[roomSlot] = NULL;
     }
+}
 
-    dealRoomCards(game);
-    startNewTurn(&game->playerOne);
-    setCanFleeFalse(&game->playerOne);
+FleeResult fleeManager(Game* game) {
+    if (game->playerOne.canFlee == false) return FLEE_BLOCKED;
+
+    returnRoomToDeck(game);
+    advanceToNextRoom(game, false);
 
     return FLEE_RESOLVED;
 }
 
 EncounterResult encounterManager(Game* game, int chosenSlot, CombatChoice combatChoice) {
-    if (!canEncounterCards(game)) return ENCOUNTER_BLOCKED_ROOM_NOT_CLEARED;
+    if (!canEncounterCards(game)) return ENCOUNTER_BLOCKED_ROOM_NOT_CLEARED;   // If no cards can be faced, stop here
     if (isRoomSlotEmpty(game, chosenSlot)) return ENCOUNTER_BLOCKED_EMPTY_SLOT;
 
     Card* cardOnTable = game->roomSlots[chosenSlot];
@@ -209,7 +187,7 @@ EncounterResult encounterManager(Game* game, int chosenSlot, CombatChoice combat
     Player* player = &game->playerOne;
     Zone* discardPile = &game->discardPile;
 
-    setCanFleeFalse(player);
+    setPlayerCanFlee(player, false);
 
     game->roomSlots[chosenSlot] = NULL;
     game->lastResolvedCard = cardOnTable;
@@ -235,20 +213,14 @@ EncounterResult encounterManager(Game* game, int chosenSlot, CombatChoice combat
     return ENCOUNTER_RESOLVED;
 }
 
+// Bare-handed kills are discarded. Weapon kills stack on the weapon.
 void combatManager(Player* player, Card* monster, Zone* discardPile, CombatChoice combatChoice) {
-    bool useWeapon = willUseWeapon(player, monster, combatChoice);
-
     int damageTaken = decideDamageValue(player, monster, combatChoice);
-    int newHealth = clampedDamageToPlayer(player->health, player->minHealth, player->maxHealth, damageTaken);
 
-    setPlayerHealth(player, newHealth);
+    applyDamage(player, damageTaken);
 
-    if (!useWeapon) {
-        placeAtBottom(discardPile, monster);
-        return;
-    }
-
-    if (player->weapon.killCount >= MAX_MONSTER_WEAPON_STACK) {
+    // If the player went bare-handed, or the weapon can't be used on this monster
+    if (combatChoice == COMBAT_CHOICE_BARE_HANDED || !weaponUsableOnMonster(player, monster)) {
         placeAtBottom(discardPile, monster);
         return;
     }
@@ -257,17 +229,12 @@ void combatManager(Player* player, Card* monster, Zone* discardPile, CombatChoic
     player->weapon.killCount++;
 }
 
+// A second potion in the same turn is still used up, it just doesn't heal.
 void healManager(Player* player, Card* potion, Zone* discardPile) {
-    if (player->potionUsedThisTurn) {
-        placeAtBottom(discardPile, potion);
-        return;
+    if (!player->potionUsedThisTurn) {   // If no potion has been drunk yet this turn
+        applyHeal(player, potion->value);
+        player->potionUsedThisTurn = true;
     }
-
-    int healValue = potion->value;
-    int newHealth = clampedPlayerHeal(player->health, player->minHealth, player->maxHealth, healValue);
-
-    setPlayerHealth(player, newHealth);
-    player->potionUsedThisTurn = true;
 
     placeAtBottom(discardPile, potion);
 }
@@ -276,7 +243,6 @@ void equipWeapon(Player* player, Card* weapon, Zone* discardPile) {
     discardEquippedWeapon(player, discardPile);
 
     player->weapon.equipped = weapon;
-    player->weapon.killCount = 0;
 }
 
 void discardEquippedWeapon(Player* player, Zone* discardPile) {
@@ -289,8 +255,8 @@ void discardEquippedWeapon(Player* player, Zone* discardPile) {
 
     placeAtBottom(discardPile, player->weapon.equipped);
 
-    player->weapon.equipped = NULL;
-    player->weapon.killCount = 0;
+    player->weapon.equipped = PLAYER_DEFAULT_WEAPON;
+    player->weapon.killCount = PLAYER_DEFAULT_KILL_COUNT;
 }
 
 // ========================================================
@@ -300,11 +266,15 @@ int calculateFinalScore(Game* game) {
     Player* player = &game->playerOne;
 
     if (isPlayerDead(player)) {
-        return -sumRemainingMonsterValues(&game->mainDeck);
+        int remainingMonsterTotal = sumRemainingMonsterValues(&game->mainDeck);
+
+        return -remainingMonsterTotal;   // the - makes it a negative score
     }
 
     if (hasPotionVictoryBonus(game)) {
-        return player->health + game->lastResolvedCard->value;
+        int potionBonus = game->lastResolvedCard->value;
+
+        return player->health + potionBonus;
     }
 
     return player->health;
@@ -317,7 +287,7 @@ int sumRemainingMonsterValues(Zone* pile) {
         Card* currentCard = cardAtPosition(pile, position);
 
         if (currentCard->type == MONSTER) {
-            runningTotal += currentCard->value;
+            runningTotal += currentCard->value;   // same as: runningTotal = runningTotal + currentCard->value
         }
     }
 
@@ -327,20 +297,20 @@ int sumRemainingMonsterValues(Zone* pile) {
 bool hasPotionVictoryBonus(Game* game) {
     if (game->lastResolvedCard == NULL) return false;
     if (game->lastResolvedCard->type != POTION) return false;
-    if (game->playerOne.health != game->playerOne.maxHealth) return false;
+    if (game->playerOne.health != PLAYER_MAX_HEALTH) return false;
 
     return true;
 }
 
 // ========================================================
-// Helpers
+// Helpers: Questions
 // ========================================================
 bool isRoomSlotEmpty(Game* game, int slotIndex) {
     return (game->roomSlots[slotIndex] == NULL);
 }
 
 bool isPlayerDead(Player* player) {
-    return (player->health <= 0);
+    return (player->health <= PLAYER_MINIMUM_HEALTH);
 }
 
 bool isDungeonCleared(Game* game) {
@@ -352,8 +322,9 @@ bool isDungeonCleared(Game* game) {
 
 bool isGameOver(Game* game) {
     if (isPlayerDead(&game->playerOne)) return true;
+    if (isDungeonCleared(game)) return true;
 
-    return isDungeonCleared(game);
+    return false;
 }
 
 bool canEncounterCards(Game* game) {
@@ -365,60 +336,39 @@ bool canEncounterCards(Game* game) {
 
 bool isRoomComplete(Game* game) {
     if (isGameOver(game)) return false;
+    if (canEncounterCards(game)) return false;
 
-    return !canEncounterCards(game);
+    return true;
 }
 
 bool isGameSessionActive(Game* game) {
     return (game != NULL);
 }
 
+// ========================================================
+// Helpers: Combat
+// ========================================================
+// Can be negative when the weapon outclasses the monster.
 int decideDamageValue(Player* player, Card* monster, CombatChoice combatChoice) {
-    WeaponState currentState = checkWeaponState(player, monster);
+    if (combatChoice != COMBAT_CHOICE_USE_WEAPON) return monster->value;
+    if (!weaponUsableOnMonster(player, monster)) return monster->value;   // If the weapon can't be used on this monster
 
-    switch (currentState) {
-        case WEAPON_FRESH:
-        case WEAPON_VALID_COMBO:
-            if (combatChoice == COMBAT_CHOICE_BARE_HANDED) return monster->value;
-            return monster->value - getEquippedWeaponValue(player);
+    int weaponValue = getEquippedWeaponValue(player);
 
-        case WEAPON_NONE:
-        case WEAPON_INVALID_COMBO:
-        default:
-            return monster->value;
-    }
-}
-
-static WeaponState checkWeaponState(Player* player, Card* monster) {
-    if (player->weapon.equipped == NULL) return WEAPON_NONE;
-    if (player->weapon.killCount == 0) return WEAPON_FRESH;
-
-    if (monster->value <= getLastKillValue(player)) return WEAPON_VALID_COMBO;
-
-    return WEAPON_INVALID_COMBO;
-}
-
-bool willUseWeapon(Player* player, Card* monster, CombatChoice combatChoice) {
-    if (combatChoice != COMBAT_CHOICE_USE_WEAPON) return false;
-
-    return weaponUsableOnMonster(player, monster);
+    return monster->value - weaponValue;
 }
 
 bool weaponUsableOnMonster(Player* player, Card* monster) {
-    WeaponState currentState = checkWeaponState(player, monster);
+    if (player->weapon.equipped == NULL) return false;                 // no weapon
+    if (player->weapon.killCount == 0) return true;                    // fresh weapon
+    if (monster->value <= getLastKillValue(player)) return true;       // combo still going
 
-    switch (currentState) {
-        case WEAPON_FRESH:
-        case WEAPON_VALID_COMBO:
-            return true;
-
-        case WEAPON_NONE:
-        case WEAPON_INVALID_COMBO:
-        default:
-            return false;
-    }
+    return false;
 }
 
+// ========================================================
+// Helpers: Previews for the screens
+// ========================================================
 EncounterPrompt requiredEncounterPrompt(Game* game, int slotIndex) {
     if (isRoomSlotEmpty(game, slotIndex)) return ENCOUNTER_PROMPT_NONE;
 
@@ -454,40 +404,37 @@ int previewDamageTaken(Game* game, int slotIndex, CombatChoice combatChoice) {
 
     Card* chosenCard = game->roomSlots[slotIndex];
     int rawDamage = decideDamageValue(&game->playerOne, chosenCard, combatChoice);
+    int damageTaken = preventNegative(rawDamage);
 
-    return preventNegative(rawDamage);
+    return damageTaken;
 }
 
 int pendingWeaponDiscardCount(Player* player) {
     if (player->weapon.equipped == NULL) return 0;
 
-    return player->weapon.killCount + 1;
+    return player->weapon.killCount + 1; // + 1 for the weapon itself
 }
 
 bool wouldPotionBeWasted(Player* player) {
     return player->potionUsedThisTurn;
 }
 
-int clampedDamageToPlayer(int rawHealth, int minHealth, int maxHealth, int rawDamageDealt) {
-    rawDamageDealt = preventNegative(rawDamageDealt);
-    int newHealth = damageCalculation(rawHealth, rawDamageDealt);
+// ========================================================
+// Helpers: Health
+// ========================================================
+// Negative amounts count as 0, so damage never heals and potions never hurt.
+void applyDamage(Player* player, int damageTaken) {
+    int damage = preventNegative(damageTaken);
+    int newHealth = clamp(player->health - damage, PLAYER_MINIMUM_HEALTH, PLAYER_MAX_HEALTH);
 
-    return clamp(newHealth, minHealth, maxHealth);
+    setPlayerHealth(player, newHealth);
 }
 
-int damageCalculation(int currentHealth, int damageTaken) {
-    return currentHealth - damageTaken;
-}
+void applyHeal(Player* player, int healValue) {
+    int heal = preventNegative(healValue);
+    int newHealth = clamp(player->health + heal, PLAYER_MINIMUM_HEALTH, PLAYER_MAX_HEALTH);
 
-int healCalculation(int currentHealth, int healValue) {
-    return currentHealth + healValue;
-}
-
-int clampedPlayerHeal(int rawHealth, int minHealth, int maxHealth, int rawHeal) {
-    rawHeal = preventNegative(rawHeal);
-    int newHealth = healCalculation(rawHealth, rawHeal);
-
-    return clamp(newHealth, minHealth, maxHealth);
+    setPlayerHealth(player, newHealth);
 }
 
 void setPlayerHealth(Player* player, int valueToSet) {
@@ -507,23 +454,26 @@ int preventNegative(int value) {
     return value;
 }
 
-void setCanFleeFalse(Player* player) {
-    player->canFlee = false;
-}
+// ========================================================
+// Helpers: Player and room state
+// ========================================================
+void setPlayerCanFlee(Player* player, bool state) {
+    if (player == NULL) return;
 
-void setCanFleeTrue(Player* player) {
-    player->canFlee = true;
+    player->canFlee = state;
 }
 
 void startNewTurn(Player* player) {
-    player->potionUsedThisTurn = false;
+    player->potionUsedThisTurn = PLAYER_DEFAULT_POTION_STATE;
 }
 
 int countCardsInRoom(Game* game) {
     int cardsFound = 0;
 
     for (int roomSlot = 0; roomSlot < MAX_ROOM_SIZE; roomSlot++) {
-        if (!isRoomSlotEmpty(game, roomSlot)) cardsFound++;
+        if (!isRoomSlotEmpty(game, roomSlot)) {   // If the slot is not empty
+            cardsFound++;
+        }
     }
 
     return cardsFound;

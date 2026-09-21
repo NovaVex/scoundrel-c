@@ -1,6 +1,5 @@
 #pragma once
 
-
 // ========================================================
 // Input codes
 // ========================================================
@@ -37,6 +36,7 @@ typedef enum OptionsMenuInput {
     OPTIONS_TOGGLE_DEBUG = 1,
     OPTIONS_TOGGLE_AUTO_COMBAT = 2,
     OPTIONS_TOGGLE_AUTO_EQUIP = 3,
+    OPTIONS_TOGGLE_RIGGED_DECK = 4,
     OPTIONS_BACK = 9
 } OptionsMenuInput;
 

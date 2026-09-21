@@ -1,58 +1,14 @@
 // ========================================================
 // Scene_manager.c
 // --------------------------------------------------------
-// JOB
-//   A "scene" is one screen the player looks at. This file
-//   owns every screen end to end: the picture of what it
-//   looks like, the code that draws it, and the code that
-//   reads the answer. Each ask function does the same three
-//   steps in the same order:
+// Every screen: draw it, then ask. The only file that prints.
+// Throwaway at the engine port, together with Input.c.
 //
-//       1. clearScreen()          wipe the terminal
-//       2. render...()            draw it
-//       3. processUserInput()     read them   (Input.c)
+// Each screen is a picture of its output, then its render and
+// ask functions. If you change a screen, change its picture.
 //
-//   That is the entire pattern. Once you see it, every ask
-//   function in this file reads the same way.
-//
-//   Every printf in the game lives here. No other file is
-//   allowed to print. That is the whole rule.
-//
-// TEMPORARY
-//   Throwaway layer, together with Input.c. The engine port
-//   replaces both; Game_mechanics and its header move over
-//   untouched. Do not let anything important live here.
-//
-// WHO CALLS THIS FILE
-//   Game_master.c, and nothing else.
-//
-// WHAT THIS FILE CALLS
-//   Game_mechanics.h   to ask what is legal, to ask for
-//                      numbers to display, and to apply the
-//                      player's choice once it is made
-//   Input.h            to read the keyboard
-//
-// THE ONE RULE
-//   This file decides HOW to ask a question. It never decides
-//   WHAT the rules are. Every rule question goes to
-//   Game_mechanics.c and comes back as a plain answer.
-//
-// READING THIS FILE
-//   Each screen is one block: a picture of its output copied
-//   from the real program, then the function that draws it,
-//   then the function that asks. You should never have to run
-//   the code in your head to know what a screen looks like.
-//   If you change a screen, change its picture too.
-//
-// MAP OF THIS FILE, IN ORDER
-//   BASIC UTILITIES   console setup and clearing
-//   SCREEN FURNITURE  the shared pieces every screen is built from
-//   MESSAGES          one-line notices, no menu attached
-//   MENU SCREENS      main menu, pause, options
-//   PLAY SCREENS      the room, end of turn, game over
-//   ACTION PROMPTS    the four screens that ask a question
-//   TURN FLOW         encounters and fleeing, which own no screen
-//   DEBUG SCREENS     developer tools, not part of normal play
+// Basic utilities, Screen furniture, Messages, Menu screens,
+// Play screens, Action prompts, Turn flow, then Debug.
 // ========================================================
 
 #include "Scene_manager.h"
@@ -78,9 +34,9 @@ void initializeDisplay(void) {
     DWORD consoleMode = 0;
 
     if (outputHandle == INVALID_HANDLE_VALUE) return;
-    if (!GetConsoleMode(outputHandle, &consoleMode)) return;
+    if (!GetConsoleMode(outputHandle, &consoleMode)) return;   // If the console mode can't be read, stop here
 
-    SetConsoleMode(outputHandle, consoleMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    SetConsoleMode(outputHandle, consoleMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);   // | adds the flag: the current mode, plus terminal codes
 #endif
 }
 
@@ -92,24 +48,9 @@ void clearScreen(void) {
 // ========================================================
 // Screen furniture
 // --------------------------------------------------------
-// Every divider, option line and prompt in the game is drawn
-// through one of these. The border strings exist in exactly
-// one place each, so no screen hand-counts a width and no
-// screen hardcodes an option number.
-//
-// NOTE ON "const char* label"
-//   This is the first place in the project that takes text as
-//   a parameter, so here is what it means:
-//
-//     char*         a pointer to text
-//     const char*   a pointer to text this function promises
-//                   not to change
-//
-//   When you call renderTitle("PAUSED"), the "PAUSED" lives in
-//   the program's read-only memory and only its address gets
-//   passed in. The const is a promise to the compiler, which
-//   will refuse to build if the function tries to edit it.
-//   Nothing is copied, and nothing needs freeing.
+// The shared pieces every screen is built from, so no screen
+// hand-counts a border or hardcodes an option number.
+// const char* is text the function promises not to change.
 // ========================================================
 // prints:  ==============================
 void renderRule(void) {
@@ -136,27 +77,27 @@ void renderMenuOption(int optionKey, const char* label) {
 // renderToggleOption(2, "Auto-Resolve Combat", true) prints:
 //          2. Auto-Resolve Combat (Current: ON)
 void renderToggleOption(int optionKey, const char* label, bool isEnabled) {
-    printf("%d. %s (Current: %s)\n", optionKey, label, isEnabled ? "ON" : "OFF");
+    printf("%d. %s (Current: %s)\n", optionKey, label, isEnabled ? "ON" : "OFF");   // ON if enabled, otherwise OFF
 }
 
-// renderPrompt("Select an option") prints, with no newline,
-// so the player's typing appears on the same line:
-//          Select an option: _
+// renderPrompt("Select an option") prints with no newline, so
+// the player types on the same line:  Select an option: _
 void renderPrompt(const char* label) {
     printf("%s: ", label);
 }
 
-// The easter egg, in one place. Every menu that can open the
-// debug tools draws its entry through this, so the option is
-// invisible until gm->debugMenuEnabled is set, and all three
-// menus reveal and hide their entry together.
-//
-// The word is armed in routeMainMenuChoice (Game_master.c),
-// which is what Input.c's INPUT_DEBUG_COMMAND lands on.
+// The Debug Menu entry, hidden until SETTING_DEBUG_MODE is on.
+// Typing "debug" at the main menu turns it on (mainMenuManager).
 void renderDebugLine(GameMaster* gm, int optionKey) {
-    if (!gm->debugMenuEnabled) return;
+    if (!isSettingOn(gm, SETTING_DEBUG_MODE)) return;   // If debug mode is off, draw nothing
 
     renderMenuOption(optionKey, "Debug Menu");
+}
+
+// renderMonsterTitle(11) prints a blank line, then:
+//          === A 11 of M blocks your path ===
+void renderMonsterTitle(int monsterValue) {
+    printf("\n=== A %d of %c blocks your path ===\n", monsterValue, MONSTER);
 }
 
 // ========================================================
@@ -183,7 +124,7 @@ void renderInvalidSelection(void) {
 }
 
 // ========================================================
-// MENU SCREENS
+// Menu screens
 // ========================================================
 // ------------------------------------------------
 //  ==============================
@@ -196,9 +137,7 @@ void renderInvalidSelection(void) {
 //  ==============================
 //  Select an option: _
 // ------------------------------------------------
-//  "9. Debug Menu" is missing on purpose. It only
-//  appears once the player types the word "debug"
-//  at this menu. See renderDebugLine.
+//  "9. Debug Menu" only appears once debug mode is on.
 // ------------------------------------------------
 void renderMainMenu(GameMaster* gm) {
     renderRule();
@@ -219,7 +158,9 @@ int openMainMenu(GameMaster* gm) {
     clearScreen();
     renderMainMenu(gm);
 
-    return processUserInput();
+    int playerChoice = processUserInput();
+
+    return playerChoice;
 }
 
 // ------------------------------------------------
@@ -230,8 +171,7 @@ int openMainMenu(GameMaster* gm) {
 //  ==============================
 //  Select an option: _
 // ------------------------------------------------
-//  "3. Debug Menu" appears here only while the
-//  easter egg is armed. See renderDebugLine.
+//  "3. Debug Menu" only appears once debug mode is on.
 // ------------------------------------------------
 void renderPauseMenu(GameMaster* gm) {
     renderTitle("PAUSED");
@@ -249,7 +189,9 @@ int openPauseScene(GameMaster* gm) {
     clearScreen();
     renderPauseMenu(gm);
 
-    return processUserInput();
+    int playerChoice = processUserInput();
+
+    return playerChoice;
 }
 
 // ------------------------------------------------
@@ -259,24 +201,31 @@ int openPauseScene(GameMaster* gm) {
 //  9. Back
 //  ==============================
 //  Select an option: _
-//
-//  The ON/OFF values are read live from gm, so this
-//  screen redraws with whatever is set.
-//
-//  Once the easter egg is armed, line 1 appears
-//  above the rest and is the way to switch it back
-//  off again:
+// ------------------------------------------------
+//  With debug mode on, line 1 appears above the rest
+//  (and switches it back off), and line 4 below them:
 //  1. Debug Menu (Current: ON)
+//  4. Rigged Test Deck (Current: OFF)
 // ------------------------------------------------
 void renderOptionsMenu(GameMaster* gm) {
+    bool debugOn = isSettingOn(gm, SETTING_DEBUG_MODE);
+    bool autoCombatOn = isSettingOn(gm, SETTING_AUTO_RESOLVE_COMBAT);
+    bool autoEquipOn = isSettingOn(gm, SETTING_AUTO_CONFIRM_WEAPON_SWAP);
+    bool riggedDeckOn = isSettingOn(gm, SETTING_RIGGED_DECK);
+
     renderTitle("OPTIONS");
 
-    if (gm->debugMenuEnabled) {
-        renderToggleOption(OPTIONS_TOGGLE_DEBUG, "Debug Menu", gm->debugMenuEnabled);
+    if (debugOn) {
+        renderToggleOption(OPTIONS_TOGGLE_DEBUG, "Debug Menu", debugOn);
     }
 
-    renderToggleOption(OPTIONS_TOGGLE_AUTO_COMBAT, "Auto-Resolve Combat", gm->autoResolveCombat);
-    renderToggleOption(OPTIONS_TOGGLE_AUTO_EQUIP, "Auto-Confirm Weapon Swap", gm->autoConfirmWeaponSwap);
+    renderToggleOption(OPTIONS_TOGGLE_AUTO_COMBAT, "Auto-Resolve Combat", autoCombatOn);
+    renderToggleOption(OPTIONS_TOGGLE_AUTO_EQUIP, "Auto-Confirm Weapon Swap", autoEquipOn);
+
+    if (debugOn) {
+        renderToggleOption(OPTIONS_TOGGLE_RIGGED_DECK, "Rigged Test Deck", riggedDeckOn);
+    }
+
     renderMenuOption(OPTIONS_BACK, "Back");
 
     renderRule();
@@ -287,14 +236,15 @@ int openOptionsScene(GameMaster* gm) {
     clearScreen();
     renderOptionsMenu(gm);
 
-    return processUserInput();
+    int playerChoice = processUserInput();
+
+    return playerChoice;
 }
 
 // ========================================================
-// PLAY SCREENS
+// Play screens
 // ========================================================
-// The main play screen. renderActionMenu is drawn straight
-// after this one, so the player sees both together:
+// The main play screen, with renderActionMenu drawn under it:
 // ------------------------------------------------
 //  === SCOUNDREL ===
 //  HP: 20/20
@@ -310,21 +260,20 @@ int openOptionsScene(GameMaster* gm) {
 //  Slot 4: [4 of M]
 //  ==============================
 // ------------------------------------------------
-//  M = monster, P = potion, W = weapon.
-//  The number is the card's value.
+//  [value of type]: M = monster, P = potion, W = weapon.
 // ------------------------------------------------
 void renderGameState(Game* session) {
     Player* player = &session->playerOne;
 
     renderTitle("SCOUNDREL");
-    printf("HP: %d/%d\n", player->health, player->maxHealth);
+    printf("HP: %d/%d\n", player->health, PLAYER_MAX_HEALTH);
 
     renderWeaponLine(player); //decides what to print if the player is unarmed or has a weapon equipped
 
     printf("Cards in Deck: %d\n", session->mainDeck.count);
     printf("Cards in Discard: %d\n", session->discardPile.count);
-    printf("Can Flee Room? %s\n", player->canFlee ? "YES" : "NO");
-    printf("Potion Used This Turn? %s\n", player->potionUsedThisTurn ? "YES" : "NO");
+    printf("Can Flee Room? %s\n", player->canFlee ? "YES" : "NO");                        // YES if the player can flee, otherwise NO
+    printf("Potion Used This Turn? %s\n", player->potionUsedThisTurn ? "YES" : "NO");     // YES if a potion was drunk, otherwise NO
 
     renderSeparator();
 
@@ -343,12 +292,16 @@ void renderWeaponLine(Player* player) {
         return;
     }
 
+    int weaponValue = getEquippedWeaponValue(player);
+
     if (player->weapon.killCount == 0) {
-        printf("Weapon Value: %d | Last Kill: [NONE]\n", getEquippedWeaponValue(player));
+        printf("Weapon Value: %d | Last Kill: [NONE]\n", weaponValue);
         return;
     }
 
-    printf("Weapon Value: %d | Last Kill: %d\n", getEquippedWeaponValue(player), getLastKillValue(player));
+    int lastKillValue = getLastKillValue(player);
+
+    printf("Weapon Value: %d | Last Kill: %d\n", weaponValue, lastKillValue);
 }
 
 void renderRoomSlots(Game* session) {
@@ -356,11 +309,11 @@ void renderRoomSlots(Game* session) {
         Card* slotCard = session->roomSlots[roomSlot];
 
         if (slotCard == NULL) {
-            printf("Slot %d: [EMPTY]\n", roomSlot + 1);
+            printf("Slot %d: [EMPTY]\n", roomSlot + SLOT_DISPLAY_OFFSET);
             continue;
         }
 
-        printf("Slot %d: [%d of %c]\n", roomSlot + 1, slotCard->value, slotCard->type);
+        printf("Slot %d: [%d of %c]\n", roomSlot + SLOT_DISPLAY_OFFSET, slotCard->value, slotCard->type);
     }
 }
 
@@ -378,27 +331,22 @@ void renderRoomSlots(Game* session) {
 // ------------------------------------------------
 //  An emptied slot shows "1. [Empty Slot]" instead.
 //  Line 5 shows "[Cannot Flee]" once fleeing is spent.
-//  This menu only ever appears when a move is legal;
-//  a finished room is intercepted by Game_master.c
-//  before this is ever drawn.
 // ------------------------------------------------
 void renderActionMenu(Game* session) {
     renderTitle("ACTIONS");
 
     for (int roomSlot = 0; roomSlot < MAX_ROOM_SIZE; roomSlot++) {
-        // Slots are counted 0-3 internally but shown as keys 1-4.
-        // INPUT_SLOT_0 is 1, and the slot inputs are consecutive
-        // in the enum, so adding the loop counter gives the key.
-        int optionKey = INPUT_SLOT_0 + roomSlot;
+        int optionKey = INPUT_SLOT_0 + roomSlot;   // slots are 0-3 inside, keys 1-4 on screen
 
         if (isRoomSlotEmpty(session, roomSlot)) {
             renderMenuOption(optionKey, "[Empty Slot]");
             continue;
         }
 
-        printf("%d. Encounter Slot %d\n", optionKey, roomSlot + 1);
+        printf("%d. Encounter Slot %d\n", optionKey, roomSlot + SLOT_DISPLAY_OFFSET);
     }
 
+    // "Flee the Room" if the player can flee, otherwise "[Cannot Flee]"
     renderMenuOption(INPUT_FLEE, session->playerOne.canFlee ? "Flee the Room" : "[Cannot Flee]");
     renderMenuOption(INPUT_PAUSE, "Pause Game");
 
@@ -411,11 +359,12 @@ int runActiveGameScene(Game* session) {
     renderGameState(session);
     renderActionMenu(session);
 
-    return processUserInput();
+    int playerChoice = processUserInput();
+
+    return playerChoice;
 }
 
-// Drawn UNDER renderGameState, so the player sees the room
-// they just finished before pressing on:
+// Drawn under renderGameState, so the finished room stays in view:
 // ------------------------------------------------
 //  === TURN COMPLETE ===
 //  You move deeper into the dungeon.
@@ -441,12 +390,12 @@ void runTurnCompleteScene(Game* session) {
 //  You have fallen in the dungeon.
 //  Final score: -182
 //  ==============================
-//
-//  Line 2 is either "You have fallen in the dungeon."
-//  or "You cleared the dungeon."
+// ------------------------------------------------
+//  On a win, line 2 is "You cleared the dungeon."
 // ------------------------------------------------
 void renderGameOver(bool playerDied, int finalScore) {
     renderTitle("GAME OVER");
+    // "fallen" if the player died, otherwise "cleared"
     printf("%s\n", playerDied ? "You have fallen in the dungeon." : "You cleared the dungeon.");
     printf("Final score: %d\n", finalScore);
     renderRule();
@@ -459,12 +408,10 @@ void openGameOverScene(bool playerDied, int finalScore) {
 }
 
 // ========================================================
-// ACTION PROMPTS
+// Action prompts
 // ========================================================
-// Drawn in the action menu's place, under renderGameState, so
-// the player keeps their stats and the room in front of them
-// while they decide. Shown when the weapon is actually usable
-// on this monster, and only when Auto-Resolve Combat is OFF:
+// Drawn under renderGameState when the weapon can be used on
+// this monster. Skipped when Auto-Resolve Combat is ON:
 // ------------------------------------------------
 //  Slot 1: [8 of W]                 <- renderGameState
 //  Slot 2: [11 of M]
@@ -477,21 +424,25 @@ void openGameOverScene(bool playerDied, int finalScore) {
 //  2. Fight bare-handed (Damage taken: 11)
 //  Choose: _
 // ------------------------------------------------
-//  Both damage numbers come from previewDamageTaken in
-//  Game_mechanics.c, the same function combat itself
-//  uses, so the preview can never disagree with reality.
+//  Damage numbers come from previewDamageTaken, the
+//  same maths combat uses, so they always match.
 // ------------------------------------------------
 void renderCombatChoicePrompt(Game* session, int chosenSlot) {
-    printf("\n=== A %d of %c blocks your path ===\n", getSlotCardValue(session, chosenSlot), MONSTER);
+    int monsterValue = getSlotCardValue(session, chosenSlot);
+    int weaponValue = getEquippedWeaponValue(&session->playerOne);
+    int weaponDamage = previewDamageTaken(session, chosenSlot, COMBAT_CHOICE_USE_WEAPON);
+    int bareHandedDamage = previewDamageTaken(session, chosenSlot, COMBAT_CHOICE_BARE_HANDED);
+
+    renderMonsterTitle(monsterValue);
 
     printf("%d. Fight with your weapon (Value: %d | Damage taken: %d)\n",
         COMBAT_CHOICE_USE_WEAPON,
-        getEquippedWeaponValue(&session->playerOne),
-        previewDamageTaken(session, chosenSlot, COMBAT_CHOICE_USE_WEAPON));
+        weaponValue,
+        weaponDamage);
 
     printf("%d. Fight bare-handed (Damage taken: %d)\n",
         COMBAT_CHOICE_BARE_HANDED,
-        previewDamageTaken(session, chosenSlot, COMBAT_CHOICE_BARE_HANDED));
+        bareHandedDamage);
 
     renderPrompt("Choose");
 }
@@ -513,11 +464,8 @@ CombatChoice promptCombatChoice(Game* session, int chosenSlot) {
     }
 }
 
-// Drawn in the action menu's place, under renderGameState, so
-// the player keeps their stats and the room in front of them
-// while they decide. Shown when the weapon cannot be used on
-// this monster and the hit will land in full, and only when
-// Auto-Resolve Combat is OFF:
+// Drawn under renderGameState when the weapon can't be used
+// on this monster. Skipped when Auto-Resolve Combat is ON:
 // ------------------------------------------------
 //  Slot 1: [8 of W]                 <- renderGameState
 //  Slot 2: [11 of M]
@@ -532,27 +480,28 @@ CombatChoice promptCombatChoice(Game* session, int chosenSlot) {
 //  2. No, pick something else
 //  Choose: _
 // ------------------------------------------------
-//  The "no weapon" line has two shapes, the same split
-//  renderWeaponLine makes. With a worn weapon equipped:
+//  With a worn weapon equipped, line 2 becomes:
 //  Your weapon is too worn for this one (last kill: 4).
 //  You will fight bare-handed.
-// ------------------------------------------------
-//  The damage number comes from previewDamageTaken in
-//  Game_mechanics.c, the same function combat itself uses.
 // ------------------------------------------------
 void renderBareHandedConfirm(Game* session, int chosenSlot) {
     Player* player = &session->playerOne;
 
-    printf("\n=== A %d of %c blocks your path ===\n", getSlotCardValue(session, chosenSlot), MONSTER);
+    int monsterValue = getSlotCardValue(session, chosenSlot);
+    int damageTaken = previewDamageTaken(session, chosenSlot, COMBAT_CHOICE_BARE_HANDED);
+
+    renderMonsterTitle(monsterValue);
 
     if (player->weapon.equipped == NULL) {
         printf("You have no weapon. You will fight bare-handed.\n");
     } else {
-        printf("Your weapon is too worn for this one (last kill: %d).\n", getLastKillValue(player));
+        int lastKillValue = getLastKillValue(player);
+
+        printf("Your weapon is too worn for this one (last kill: %d).\n", lastKillValue);
         printf("You will fight bare-handed.\n");
     }
 
-    printf("Damage taken: %d\n", previewDamageTaken(session, chosenSlot, COMBAT_CHOICE_BARE_HANDED));
+    printf("Damage taken: %d\n", damageTaken);
 
     renderMenuOption(CONFIRM_YES, "Yes, fight it");
     renderMenuOption(CONFIRM_NO, "No, pick something else");
@@ -560,27 +509,8 @@ void renderBareHandedConfirm(Game* session, int chosenSlot) {
     renderPrompt("Choose");
 }
 
-bool promptBareHandedConfirm(Game* session, int chosenSlot) {
-    while (true) {
-        clearScreen();
-        renderGameState(session);
-        renderBareHandedConfirm(session, chosenSlot);
-
-        int playerChoice = processUserInput();
-
-        if (playerChoice == CONFIRM_YES) return true;
-        if (playerChoice == CONFIRM_NO) return false;
-        if (playerChoice == INPUT_END_OF_STREAM) return false;
-
-        renderInvalidSelection();
-        pressEnterToContinue();
-    }
-}
-
-// Drawn in the action menu's place, under renderGameState, so
-// the weapon being given up and its kill count stay on screen
-// while the player decides. Only shown when a weapon is already
-// equipped, and only when Auto-Confirm Weapon Swap is OFF:
+// Drawn under renderGameState when a weapon is already
+// equipped. Skipped when Auto-Confirm Weapon Swap is ON:
 // ------------------------------------------------
 //  Weapon Value: 7 | Last Kill: 9   <- renderGameState
 //  ...
@@ -594,10 +524,9 @@ bool promptBareHandedConfirm(Game* session, int chosenSlot) {
 //  2. No, leave it
 //  Choose: _
 // ------------------------------------------------
-//  The count comes from pendingWeaponDiscardCount, so it
-//  always matches what discardEquippedWeapon will throw away.
-// ------------------------------------------------
-void renderWeaponSwapConfirm(int cardsAtRisk) {
+void renderWeaponSwapConfirm(Player* player) {
+    int cardsAtRisk = pendingWeaponDiscardCount(player);
+
     printf("\nEquipping this weapon will discard your current weapon and its kill stack (%d card(s)).\n", cardsAtRisk);
 
     renderMenuOption(CONFIRM_YES, "Yes, equip it");
@@ -606,28 +535,8 @@ void renderWeaponSwapConfirm(int cardsAtRisk) {
     renderPrompt("Choose");
 }
 
-bool promptWeaponSwapConfirm(Game* session) {
-    while (true) {
-        clearScreen();
-        renderGameState(session);
-        renderWeaponSwapConfirm(pendingWeaponDiscardCount(&session->playerOne));
-
-        int playerChoice = processUserInput();
-
-        if (playerChoice == CONFIRM_YES) return true;
-        if (playerChoice == CONFIRM_NO) return false;
-        if (playerChoice == INPUT_END_OF_STREAM) return false;
-
-        renderInvalidSelection();
-        pressEnterToContinue();
-    }
-}
-
-// Drawn in the action menu's place, under renderGameState, so
-// the "Potion Used This Turn? YES" line that causes this warning
-// is visible right above it. Only shown for a second potion in
-// the same turn. No toggle skips this one; wasting a potion
-// always asks:
+// Drawn under renderGameState for a second potion in one
+// turn. No setting skips this one:
 // ------------------------------------------------
 //  HP: 14/20                        <- renderGameState
 //  ...
@@ -651,11 +560,28 @@ void renderPotionWasteConfirm(void) {
     renderPrompt("Choose");
 }
 
-bool promptPotionWasteConfirm(Game* session) {
+// The ask for all three yes/no screens above. Returns true for YES.
+bool promptConfirm(Game* session, EncounterPrompt prompt, int chosenSlot) {
     while (true) {
         clearScreen();
         renderGameState(session);
-        renderPotionWasteConfirm();
+
+        switch (prompt) {
+            case ENCOUNTER_PROMPT_BARE_HANDED_CONFIRM:
+                renderBareHandedConfirm(session, chosenSlot);
+                break;
+
+            case ENCOUNTER_PROMPT_WEAPON_SWAP:
+                renderWeaponSwapConfirm(&session->playerOne);
+                break;
+
+            case ENCOUNTER_PROMPT_POTION_WASTE:
+                renderPotionWasteConfirm();
+                break;
+
+            default:
+                return true;
+        }
 
         int playerChoice = processUserInput();
 
@@ -669,18 +595,18 @@ bool promptPotionWasteConfirm(Game* session) {
 }
 
 // ========================================================
-// TURN FLOW
+// Turn flow
 // --------------------------------------------------------
-// These own no screen of their own. They pick which prompt
-// above to run, hand the answer to Game_mechanics.c, and
-// report whatever comes back.
+// No screen of their own: pick a prompt from above, pass the
+// answer to Game_mechanics, and report what comes back.
 // ========================================================
 EncounterResult runEncounterScene(Game* session, GameMaster* gm, int chosenSlot) {
     CombatChoice combatChoice = COMBAT_CHOICE_BARE_HANDED;
+    EncounterPrompt prompt = requiredEncounterPrompt(session, chosenSlot);
 
-    switch (requiredEncounterPrompt(session, chosenSlot)) {
+    switch (prompt) {
         case ENCOUNTER_PROMPT_COMBAT_CHOICE:
-            if (gm->autoResolveCombat) {
+            if (isSettingOn(gm, SETTING_AUTO_RESOLVE_COMBAT)) {
                 combatChoice = COMBAT_CHOICE_USE_WEAPON;
                 break;
             }
@@ -688,23 +614,17 @@ EncounterResult runEncounterScene(Game* session, GameMaster* gm, int chosenSlot)
             break;
 
         case ENCOUNTER_PROMPT_BARE_HANDED_CONFIRM:
-            if (gm->autoResolveCombat) break;
-
-            if (!promptBareHandedConfirm(session, chosenSlot)) {
-                return ENCOUNTER_CANCELLED;
-            }
+            if (isSettingOn(gm, SETTING_AUTO_RESOLVE_COMBAT)) break;
+            if (!promptConfirm(session, prompt, chosenSlot)) return ENCOUNTER_CANCELLED;   // If the player said no
             break;
 
         case ENCOUNTER_PROMPT_WEAPON_SWAP:
-            if (gm->autoConfirmWeaponSwap) break;
-
-            if (!promptWeaponSwapConfirm(session)) {
-                return ENCOUNTER_CANCELLED;
-            }
+            if (isSettingOn(gm, SETTING_AUTO_CONFIRM_WEAPON_SWAP)) break;
+            if (!promptConfirm(session, prompt, chosenSlot)) return ENCOUNTER_CANCELLED;   // If the player said no
             break;
 
         case ENCOUNTER_PROMPT_POTION_WASTE:
-            if (!promptPotionWasteConfirm(session)) return ENCOUNTER_CANCELLED;
+            if (!promptConfirm(session, prompt, chosenSlot)) return ENCOUNTER_CANCELLED;   // If the player said no
             break;
 
         case ENCOUNTER_PROMPT_NONE:
@@ -750,7 +670,7 @@ void reportEncounterResult(EncounterResult result) {
 }
 
 // ========================================================
-// DEBUG SCREENS
+// Debug screens
 // ========================================================
 // ------------------------------------------------
 //  === DEBUG MENU ===
@@ -778,11 +698,11 @@ void renderDebugMenu(void) {
 }
 
 void openDebugMenu(GameMaster* gm, Game* session) {
-    if (!gm->debugMenuEnabled) return;
+    if (!isSettingOn(gm, SETTING_DEBUG_MODE)) return;   // If debug mode is off, stop here
 
-    gm->debugOpen = true;
+    gm->isDebugMenuOpen = true;
 
-    while (gm->debugOpen) {
+    while (gm->isDebugMenuOpen) {
         clearScreen();
         renderDebugMenu();
 
@@ -790,12 +710,20 @@ void openDebugMenu(GameMaster* gm, Game* session) {
 
         switch (playerChoice) {
             case DEBUG_PRINT_MAIN_DECK:
-                printSessionDeck(session);
+                if (!isGameSessionActive(session)) {   // If there is no game running
+                    renderNoActiveSession();
+                } else {
+                    printSessionDeck(session);
+                }
                 pressEnterToContinue();
                 break;
 
             case DEBUG_PRINT_DISCARD_PILE:
-                printDiscardPile(session);
+                if (!isGameSessionActive(session)) {   // If there is no game running
+                    renderNoActiveSession();
+                } else {
+                    printDiscardPile(session);
+                }
                 pressEnterToContinue();
                 break;
 
@@ -804,18 +732,26 @@ void openDebugMenu(GameMaster* gm, Game* session) {
                 break;
 
             case DEBUG_PRINT_PLAYER_STATS:
-                printCurrentPlayerStats(session);
+                if (!isGameSessionActive(session)) {   // If there is no game running
+                    renderNoActiveSession();
+                } else {
+                    printCurrentPlayerStats(session);
+                }
                 pressEnterToContinue();
                 break;
 
             case DEBUG_PRINT_DUNGEON_ROOM:
-                printDungeonRoom(session);
+                if (!isGameSessionActive(session)) {   // If there is no game running
+                    renderNoActiveSession();
+                } else {
+                    printDungeonRoom(session);
+                }
                 pressEnterToContinue();
                 break;
 
             case DEBUG_CLOSE_MENU:
             case INPUT_END_OF_STREAM:
-                gm->debugOpen = false;
+                gm->isDebugMenuOpen = false;
                 return;
 
             default:
@@ -830,6 +766,7 @@ void debugGenerateTempTestDeck(void) {
     int totalCards = generateGlobalCardPool(tempSession.globalCardPool);
 
     buildDeck(&tempSession, totalCards);
+    cardShuffle(tempSession.mainDeck.cards, totalCards);
 
     printEntireDeckLoop(&tempSession.mainDeck);
     pressEnterToContinue();
@@ -839,16 +776,12 @@ void debugGenerateTempTestDeck(void) {
 // Debug printing (targeted)
 // ========================================================
 void printCurrentPlayerStats(Game* session) {
-    if (!isGameSessionActive(session)) {
-        renderNoActiveSession();
-        return;
-    }
-
     Player* player = &session->playerOne;
+    int weaponValue = getEquippedWeaponValue(player);
 
-    printf("Max HP: %d\n", player->maxHealth);
+    printf("Max HP: %d\n", PLAYER_MAX_HEALTH);
     printf("Current HP: %d\n", player->health);
-    printf("Weapon Value: %d\n", getEquippedWeaponValue(player));
+    printf("Weapon Value: %d\n", weaponValue);
     printf("Kill Count: %d\n", player->weapon.killCount);
 }
 
@@ -876,39 +809,24 @@ void printEntireDeckLoop(Zone* pile) {
 // Debug tools (session level)
 // ========================================================
 void printSessionDeck(Game* session) {
-    if (!isGameSessionActive(session)) {
-        renderNoActiveSession();
-        return;
-    }
-
     printEntireDeckLoop(&session->mainDeck);
 }
 
 void printDiscardPile(Game* session) {
-    if (!isGameSessionActive(session)) {
-        renderNoActiveSession();
-        return;
-    }
-
     printEntireDeckLoop(&session->discardPile);
 }
 
 void printDungeonRoom(Game* session) {
-    if (!isGameSessionActive(session)) {
-        renderNoActiveSession();
-        return;
-    }
-
     for (int roomSlot = 0; roomSlot < MAX_ROOM_SIZE; roomSlot++) {
         Card* slotCard = session->roomSlots[roomSlot];
 
         if (slotCard == NULL) {
-            printf("Dungeon Slot %d | [EMPTY]\n", roomSlot + 1);
+            printf("Dungeon Slot %d | [EMPTY]\n", roomSlot + SLOT_DISPLAY_OFFSET);
             continue;
         }
 
         printf("Dungeon Slot %d | Card ID: %d | Type: %c | Value: %d\n",
-            roomSlot + 1,
+            roomSlot + SLOT_DISPLAY_OFFSET,
             slotCard->id,
             slotCard->type,
             slotCard->value);
