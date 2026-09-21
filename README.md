@@ -14,8 +14,8 @@ Download one file and run it. No installer, nothing to set up.
 
 | Platform | File |
 |---|---|
-| Windows (64-bit) | `scoundrel-v0.1.0-windows-x86_64.exe` |
-| Linux (64-bit) | `scoundrel-v0.1.0-linux-x86_64` |
+| Windows (64-bit) | `scoundrel-v0.1.2-windows-x86_64.exe` |
+| Linux (64-bit) | `scoundrel-v0.1.2-linux-x86_64` |
 
 Both are on the [latest release page](https://github.com/NovaVex/scoundrel-c/releases/latest).
 
@@ -32,8 +32,8 @@ If you'd rather not run an unsigned binary, the source is right here and it buil
 Download the file, make it executable, then run it:
 
 ```bash
-chmod +x scoundrel-v0.1.0-linux-x86_64
-./scoundrel-v0.1.0-linux-x86_64
+chmod +x scoundrel-v0.1.2-linux-x86_64
+./scoundrel-v0.1.2-linux-x86_64
 ```
 
 It's statically linked, so it doesn't care what distro you're on or what version of glibc you have.
