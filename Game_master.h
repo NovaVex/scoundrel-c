@@ -3,7 +3,7 @@
 #include "Game_mechanics.h"
 
 //Version Definitions
-#define GAME_VERSION "0.1.1"
+#define GAME_VERSION "0.1.2"
 
 //Game settings definitions Maybe move definitions.
 #define AUTO_RESOLVE_COMBAT_DEFAULT false
