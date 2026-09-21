@@ -54,7 +54,7 @@ The number beside the letter is the card's value. Everything else is in [The rul
 
 C isn't the easy path, and that was part of the appeal. I chose it because I wanted to understand computers at the foundational level, and C gets you about as close to the machine as you can while still writing something readable. Along the way I picked up binary and hex, and spent a lot of time on what's actually happening under the hood of a programming language, digging past what the syntax does into why it exists in the first place.
 
-That understanding fed directly back into the code. The architectural decisions here come from thinking about what the hardware is physically doing: how memory is laid out, why the card pool is a fixed array with a separate pool of link nodes, and why nothing allocates at runtime.
+That understanding fed directly back into the code. The architectural decisions here come from thinking about what the hardware is physically doing: how memory is laid out, why the card pool is a fixed array and each pile is a fixed ring of card pointers, and why nothing allocates at runtime.
 
 The same philosophy applied to my tools. I wrote the whole project in Notepad++ on default settings. The only things it gave me were syntax highlighting and a basic autocomplete that repeats words already typed in the open file. There was no error checking and no knowledge of my other files. If I wanted to call a function from another file, I had to actually know it existed and what it took, which was the point. The commit history even records the cost of that choice: Notepad++ left the files with messy line endings, which had to be normalized and locked down with a .gitattributes when the project moved to git. Having built the foundation the hard way, I'm now learning to use VS Code.
 
@@ -88,15 +88,13 @@ The code is split into strict layers, each with one job:
 
 ```
 main.c            → hands control to the engine and nothing else
-Game_master       → state machine conductor; owns the game loop
-Scene_manager     → screens and menus; collects the player's choice
-UI_manager        → all rendering and printing lives here
-Input             → raw input handling
-Game_mechanics    → pure rules logic; zero stdio, zero printing
-Data_Structure.h  → shared types used by every layer
+Game_master       → state machine conductor; owns the loops and settings
+Scene_manager     → every screen: draws it, collects the choice; the only file that prints
+Input             → raw keyboard reading (key codes in Terminal_Input.h)
+Game_mechanics    → pure rules logic and its types; zero stdio, zero printing
 ```
 
-The design rule that governs everything: the game logic must be liftable into a future engine by replacing only `UI_manager` and `Input`, leaving `Data_Structure` and `Game_mechanics` untouched. `Game_mechanics.c` doesn't include stdio at all. It talks to the rest of the program through data alone.
+The design rule that governs everything: the game logic must be liftable into a future engine by replacing only `Scene_manager` and `Input`, leaving `Game_mechanics` untouched. `Game_mechanics.c` doesn't include stdio at all. It talks to the rest of the program through data alone.
 
 Style rules are enforced across every file:
 
@@ -111,12 +109,12 @@ Rather than documenting every function here (that's what code comments are for),
 
 1. `main.c` calls `gameMaster()`, which owns the top-level state machine (main menu, options, in-game).
 2. Starting a game enters `gameLoop()`, which runs its own in-game state machine (active, paused, game over).
-3. Each active turn, `Game_master` first asks `Game_mechanics` whether the room is finished (`isRoomComplete()`). If it is, the only legal action is to press on, so it shows the turn-complete screen and deals the next room itself. No menu, no wasted keypress.
-4. Otherwise `Game_master` asks `Scene_manager` to draw the room and collect a choice. `Scene_manager` prints through `UI_manager` and reads through `Input`. It never touches game rules.
+3. Each active turn, `Game_master` first asks `Game_mechanics` whether the game is over (`isGameOver()`), then whether the room is finished (`isRoomComplete()`). If it is, the only legal action is to press on, so it shows the turn-complete screen and deals the next room itself. No menu, no wasted keypress.
+4. Otherwise `Game_master` asks `Scene_manager` to draw the room and collect a choice. `Scene_manager` does the printing itself and reads through `Input`. It never touches game rules.
 5. The choice comes back as a `PlayerInput` enum value. `Game_master` routes it: an encounter slot goes to `runEncounterScene()`, fleeing goes to `runFleeScene()`.
 6. Before anything is resolved, `runEncounterScene()` calls `requiredEncounterPrompt()` in `Game_mechanics` to find out whether the player needs asking first: fight with the weapon or bare-handed, confirm a fight the weapon can't help with and the damage it will cost, confirm discarding an equipped weapon and its kill stack, or confirm burning an already-spent potion.
 7. The answer is handed down as a `CombatChoice` into `encounterManager()`, which looks at the card's type and dispatches to exactly one of `combatManager()`, `healManager()`, or `equipWeapon()`. These change player and card state and nothing else. No printing, no input.
-8. `encounterManager()` returns an `EncounterResult`. If the move was illegal, the scene renders the reason instead of failing silently. Control returns to `Game_master`, which checks for death, and the loop continues.
+8. `encounterManager()` returns an `EncounterResult`. If the move was illegal, the scene renders the reason instead of failing silently. Control returns to `Game_master`, which checks whether the player has died or cleared the dungeon, and the loop continues.
 
 That one-way flow is the entire program: the master asks the scenes for input, routes it into the mechanics, the mechanics change state and report back a result code, and the master reads the new state. Because `Game_mechanics` can't print, a refusal has to travel back out as a return code. That's what keeps the rules layer portable.
 
@@ -149,11 +147,11 @@ That was one of the first design calls I made on my own, and the deck code got s
 
 ### One rule I had to interpret
 
-The PDF contradicts itself in one place. It says a used weapon can only slay monsters of "a lower value (less than equal)" than the last one it killed. Those two readings disagree, and the worked examples underneath (a 6 against a 12, a 12 against a 6) never land on the case where the values match.
+The PDF contradicts itself in one place. It says a used weapon can only slay monsters of "a lower value (less than equal)" than the last one it killed. "Lower" means strictly less, but "less than equal" allows a match. Those two readings disagree, and the worked examples underneath (a 6 against a 12, a 12 against a 6) never land on the case where the values match.
 
 I went with the parenthetical, so a weapon that killed an 8 can still take another 8. Most write-ups of the rules I found read it the same way.
 
-The bigger reason is that it plays better. The strict reading burns weapons down faster, and you get more turns where nothing you're carrying helps and you just take the hit. Allowing equal values keeps a weapon useful longer and cuts down on games that were already lost a few turns before the player could tell. Flipping it back is one operator in `checkWeaponState`.
+The bigger reason is that it plays better. The strict reading burns weapons down faster, and you get more turns where nothing you're carrying helps and you just take the hit. Allowing equal values keeps a weapon useful longer and cuts down on games that were already lost a few turns before the player could tell. Flipping it back is one operator in `weaponUsableOnMonster`.
 
 ## What's next
 
@@ -164,7 +162,7 @@ This alpha is the platform for everything below, roughly in order:
 3. **Save/load**: serializing game state to a human-readable format
 4. **Replay feature**: recording a game's inputs so a full playthrough can be played back, which doubles as proof that the logic layer is truly deterministic and decoupled
 5. **Demo mode**: a pre-recorded playthrough anyone can watch without learning the rules
-6. **Engine port**: unhooking the game from the terminal and plugging it into a game engine. This is the whole architecture's final exam. If the layer separation holds, only `UI_manager` and `Input` get replaced, and `Game_mechanics` and `Data_Structure` move over untouched
+6. **Engine port**: unhooking the game from the terminal and plugging it into a game engine. This is the whole architecture's final exam. If the layer separation holds, only `Scene_manager` and `Input` get replaced, and `Game_mechanics` moves over untouched
 7. **Portfolio page**: a site where the game is playable in two modes, the original terminal version and the engine version running in the browser
 
 ---
