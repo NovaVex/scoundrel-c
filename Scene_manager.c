@@ -95,9 +95,39 @@ void renderDebugLine(GameMaster* gm, int optionKey) {
 }
 
 // renderMonsterTitle(11) prints a blank line, then:
-//          === A 11 of M blocks your path ===
+//          === A Monster (11 damage) blocks your path ===
 void renderMonsterTitle(int monsterValue) {
-    printf("\n=== A %d of %c blocks your path ===\n", monsterValue, MONSTER);
+    printf("\n=== A Monster (%d damage) blocks your path ===\n", monsterValue);
+}
+
+// The word shown for a card's type: Monster, Potion or Weapon.
+const char* cardTypeName(Card* card) {
+    switch (card->type) {
+        case MONSTER: return "Monster";
+        case POTION:  return "Potion";
+        case WEAPON:  return "Weapon";
+        default:      return "Card";
+    }
+}
+
+// What taking this card means: Fight, Drink or Equip.
+const char* cardActionVerb(Card* card) {
+    switch (card->type) {
+        case MONSTER: return "Fight";
+        case POTION:  return "Drink";
+        case WEAPON:  return "Equip";
+        default:      return "Take";
+    }
+}
+
+// The rulebook's word for a card's number: Monster (10 damage), Weapon (5 damage), Potion (7 health).
+const char* cardValueLabel(Card* card) {
+    switch (card->type) {
+        case MONSTER: return "damage";
+        case POTION:  return "health";
+        case WEAPON:  return "damage";
+        default:      return "value";
+    }
 }
 
 // ========================================================
@@ -254,13 +284,11 @@ int openOptionsScene(GameMaster* gm) {
 //  Can Flee Room? YES
 //  Potion Used This Turn? NO
 //  ------------------------------
-//  Slot 1: [2 of M]               <- renderRoomSlots
-//  Slot 2: [10 of M]
-//  Slot 3: [7 of P]
-//  Slot 4: [4 of M]
+//  Slot 1: Monster (2 damage)     <- renderRoomSlots
+//  Slot 2: Monster (10 damage)
+//  Slot 3: Potion (7 health)
+//  Slot 4: Empty
 //  ==============================
-// ------------------------------------------------
-//  [value of type]: M = monster, P = potion, W = weapon.
 // ------------------------------------------------
 void renderGameState(Game* session) {
     Player* player = &session->playerOne;
@@ -309,21 +337,24 @@ void renderRoomSlots(Game* session) {
         Card* slotCard = session->roomSlots[roomSlot];
 
         if (slotCard == NULL) {
-            printf("Slot %d: [EMPTY]\n", roomSlot + SLOT_DISPLAY_OFFSET);
+            printf("Slot %d: Empty\n", roomSlot + SLOT_DISPLAY_OFFSET);
             continue;
         }
 
-        printf("Slot %d: [%d of %c]\n", roomSlot + SLOT_DISPLAY_OFFSET, slotCard->value, slotCard->type);
+        const char* typeName = cardTypeName(slotCard);
+        const char* valueLabel = cardValueLabel(slotCard);
+
+        printf("Slot %d: %s (%d %s)\n", roomSlot + SLOT_DISPLAY_OFFSET, typeName, slotCard->value, valueLabel);
     }
 }
 
 // Drawn directly under renderGameState:
 // ------------------------------------------------
 //  === ACTIONS ===
-//  1. Encounter Slot 1
-//  2. Encounter Slot 2
-//  3. Encounter Slot 3
-//  4. Encounter Slot 4
+//  1. Fight the Monster (2 damage)
+//  2. Fight the Monster (10 damage)
+//  3. Drink the Potion (7 health)
+//  4. Fight the Monster (4 damage)
 //  5. Flee the Room
 //  9. Pause Game
 //  ==============================
@@ -343,7 +374,12 @@ void renderActionMenu(Game* session) {
             continue;
         }
 
-        printf("%d. Encounter Slot %d\n", optionKey, roomSlot + SLOT_DISPLAY_OFFSET);
+        Card* slotCard = session->roomSlots[roomSlot];
+        const char* actionVerb = cardActionVerb(slotCard);
+        const char* typeName = cardTypeName(slotCard);
+        const char* valueLabel = cardValueLabel(slotCard);
+
+        printf("%d. %s the %s (%d %s)\n", optionKey, actionVerb, typeName, slotCard->value, valueLabel);
     }
 
     // "Flee the Room" if the player can flee, otherwise "[Cannot Flee]"
@@ -413,13 +449,13 @@ void openGameOverScene(bool playerDied, int finalScore) {
 // Drawn under renderGameState when the weapon can be used on
 // this monster. Skipped when Auto-Resolve Combat is ON:
 // ------------------------------------------------
-//  Slot 1: [8 of W]                 <- renderGameState
-//  Slot 2: [11 of M]
-//  Slot 3: [3 of M]
-//  Slot 4: [EMPTY]
+//  Slot 1: Weapon (8 damage)      <- renderGameState
+//  Slot 2: Monster (11 damage)
+//  Slot 3: Monster (3 damage)
+//  Slot 4: Empty
 //  ==============================
 //
-//  === A 11 of M blocks your path ===
+//  === A Monster (11 damage) blocks your path ===
 //  1. Fight with your weapon (Value: 7 | Damage taken: 4)
 //  2. Fight bare-handed (Damage taken: 11)
 //  Choose: _
@@ -467,13 +503,13 @@ CombatChoice promptCombatChoice(Game* session, int chosenSlot) {
 // Drawn under renderGameState when the weapon can't be used
 // on this monster. Skipped when Auto-Resolve Combat is ON:
 // ------------------------------------------------
-//  Slot 1: [8 of W]                 <- renderGameState
-//  Slot 2: [11 of M]
-//  Slot 3: [3 of M]
-//  Slot 4: [EMPTY]
+//  Slot 1: Weapon (8 damage)      <- renderGameState
+//  Slot 2: Monster (11 damage)
+//  Slot 3: Monster (3 damage)
+//  Slot 4: Empty
 //  ==============================
 //
-//  === A 11 of M blocks your path ===
+//  === A Monster (11 damage) blocks your path ===
 //  You have no weapon. You will fight bare-handed.
 //  Damage taken: 11
 //  1. Yes, fight it
@@ -514,8 +550,8 @@ void renderBareHandedConfirm(Game* session, int chosenSlot) {
 // ------------------------------------------------
 //  Weapon Value: 7 | Last Kill: 9   <- renderGameState
 //  ...
-//  Slot 1: [8 of W]
-//  Slot 2: [11 of M]
+//  Slot 1: Weapon (8 damage)
+//  Slot 2: Monster (11 damage)
 //  ==============================
 //
 //  Equipping this weapon will discard your current
@@ -542,7 +578,7 @@ void renderWeaponSwapConfirm(Player* player) {
 //  ...
 //  Potion Used This Turn? YES
 //  ------------------------------
-//  Slot 1: [5 of P]
+//  Slot 1: Potion (5 health)
 //  ==============================
 //
 //  You already drank a potion this turn. This one

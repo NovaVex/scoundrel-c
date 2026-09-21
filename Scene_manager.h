@@ -23,6 +23,9 @@ void renderToggleOption(int optionKey, const char* label, bool isEnabled);
 void renderPrompt(const char* label);
 void renderDebugLine(GameMaster* gm, int optionKey);
 void renderMonsterTitle(int monsterValue);
+const char* cardTypeName(Card* card);
+const char* cardActionVerb(Card* card);
+const char* cardValueLabel(Card* card);
 
 // ========================================================
 // Messages

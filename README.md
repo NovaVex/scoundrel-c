@@ -42,13 +42,20 @@ It's statically linked, so it doesn't care what distro you're on or what version
 
 The whole game is numbers on the keyboard. Type a number, press Enter.
 
-Each room deals four cards, labelled by what they do rather than by suit:
+Each room deals four cards, labelled by what they are rather than by suit, with the number in the rulebook's own words:
 
-- **M** is a monster. Fighting it costs you health equal to its value, less your weapon's value if your weapon can still be used on it.
-- **W** is a weapon. Equipping one discards whatever you were already carrying.
-- **P** is a potion. It heals you, but only the first one each turn.
+```
+Slot 1: Weapon (5 damage)
+Slot 2: Monster (10 damage)
+Slot 3: Potion (7 health)
+Slot 4: Empty
+```
 
-The number beside the letter is the card's value. Everything else is in [The rules](#the-rules) below.
+- **Monster (10 damage)**: fighting it costs you that much health, less your weapon's damage if your weapon can still be used on it.
+- **Weapon (5 damage)**: equipping one discards whatever you were already carrying.
+- **Potion (7 health)**: heals you by that much, but only the first one each turn.
+
+The action menu under the room says what each choice does, like `2. Fight the Monster (10 damage)`. Everything else is in [The rules](#the-rules) below.
 
 ## Why C
 
